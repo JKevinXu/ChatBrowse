@@ -5,6 +5,7 @@ import { createMessage, loadFromStorage, saveToStorage } from './utils';
 let chatMessages: HTMLElement | null = null;
 let userInput: HTMLInputElement | null = null;
 let sendButton: HTMLElement | null = null;
+let settingsButton: HTMLElement | null = null;
 
 // Current chat session
 let currentSession: ChatSession | null = null;
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   chatMessages = document.getElementById('chatMessages');
   userInput = document.getElementById('userInput') as HTMLInputElement;
   sendButton = document.getElementById('sendButton');
+  settingsButton = document.getElementById('settingsButton');
   
   // Set up event listeners
   if (userInput && sendButton) {
@@ -31,6 +33,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.key === 'Enter') {
         handleSendMessage();
       }
+    });
+  }
+
+  // Set up settings button
+  if (settingsButton) {
+    settingsButton.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage ? 
+        chrome.runtime.openOptionsPage() : 
+        window.open(chrome.runtime.getURL('settings.html'));
     });
   }
   

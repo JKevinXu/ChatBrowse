@@ -14,6 +14,8 @@ interface Chrome {
     onInstalled: {
       addListener: (callback: (details: { reason: string; previousVersion?: string; temporary?: boolean }) => void) => void;
     };
+    openOptionsPage?: () => void;
+    getURL: (path: string) => string;
   };
   
   storage: {
@@ -28,6 +30,10 @@ interface Chrome {
       set: (items: object, callback?: () => void) => void;
       remove: (keys: string | string[], callback?: () => void) => void;
       clear: (callback?: () => void) => void;
+    };
+    onChanged: {
+      addListener: (callback: (changes: { [key: string]: { oldValue?: any; newValue?: any } }, namespace: string) => void) => void;
+      removeListener: (callback: (changes: { [key: string]: { oldValue?: any; newValue?: any } }, namespace: string) => void) => void;
     };
   };
   
@@ -65,6 +71,11 @@ declare namespace chrome {
     tlsChannelId?: string;
   }
 
+  export interface StorageChange {
+    oldValue?: any;
+    newValue?: any;
+  }
+
   export interface Storage {
     local: {
       get: (keys: string | string[] | object | null, callback: (items: { [key: string]: any }) => void) => void;
@@ -77,6 +88,10 @@ declare namespace chrome {
       set: (items: object, callback?: () => void) => void;
       remove: (keys: string | string[], callback?: () => void) => void;
       clear: (callback?: () => void) => void;
+    };
+    onChanged: {
+      addListener: (callback: (changes: { [key: string]: StorageChange }, namespace: string) => void) => void;
+      removeListener: (callback: (changes: { [key: string]: StorageChange }, namespace: string) => void) => void;
     };
   }
 

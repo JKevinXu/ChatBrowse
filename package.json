@@ -11,6 +11,9 @@
   "keywords": ["chrome-extension", "chat", "browsing", "typescript"],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "openai": "^4.28.0"
+  },
   "devDependencies": {
     "copy-webpack-plugin": "^13.0.0",
     "ts-loader": "^9.5.2",

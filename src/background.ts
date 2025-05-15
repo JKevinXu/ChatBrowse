@@ -1,5 +1,30 @@
-import { ChatCommand, ChatResponse, PageInfo } from './types';
+import { ChatCommand, ChatResponse, PageInfo, StorageData } from './types';
 import { saveToStorage, loadFromStorage } from './utils';
+import OpenAI from 'openai';
+
+// Store OpenAI instance
+let openai: OpenAI | null = null;
+
+// Initialize OpenAI with API key
+async function initializeOpenAI(): Promise<boolean> {
+  try {
+    const settings = await loadFromStorage<StorageData['settings']>('settings');
+    if (settings && settings.openaiApiKey) {
+      openai = new OpenAI({
+        apiKey: settings.openaiApiKey,
+        dangerouslyAllowBrowser: true // Required for Chrome extension
+      });
+      console.log('OpenAI initialized successfully');
+      return true;
+    } else {
+      console.log('OpenAI API key not found in settings');
+      return false;
+    }
+  } catch (error) {
+    console.error('Failed to initialize OpenAI:', error);
+    return false;
+  }
+}
 
 // Initialize the extension when installed
 chrome.runtime.onInstalled.addListener(() => {
@@ -9,12 +34,24 @@ chrome.runtime.onInstalled.addListener(() => {
   const defaultSettings = {
     theme: 'light',
     fontSize: 'medium',
-    showNotifications: true
+    showNotifications: true,
+    openaiApiKey: ''
   };
   
   saveToStorage('settings', defaultSettings).catch(err => {
     console.error('Failed to save default settings:', err);
   });
+
+  // Initialize OpenAI
+  initializeOpenAI();
+});
+
+// Listen for settings changes
+chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.StorageChange }, namespace: string) => {
+  if (namespace === 'local' && changes.settings) {
+    // Re-initialize OpenAI with new settings
+    initializeOpenAI();
+  }
 });
 
 // Handle messages from content script and popup
@@ -49,27 +86,29 @@ chrome.runtime.onMessage.addListener((message: ChatCommand, sender, sendResponse
 });
 
 // Process user messages and generate responses
-function handleUserMessage(
+async function handleUserMessage(
   { text, sessionId }: { text: string; sessionId: string },
   sender: chrome.MessageSender,
   sendResponse: (response: ChatResponse) => void
 ) {
-  // Here we'd typically use an AI or NLP service to process the message
-  // For now, just echo back a simple response
+  // Process commands for navigation, extraction, etc.
+  const lowerText = text.toLowerCase().trim();
   
-  // Simple command processing
-  if (text.toLowerCase().includes('hello') || text.toLowerCase().includes('hi')) {
+  // Handle simple navigation commands directly
+  if (lowerText.startsWith('go to ') || lowerText.startsWith('navigate to ')) {
+    const url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
     sendResponse({
       type: 'MESSAGE',
       payload: {
-        text: 'Hello! How can I help you navigate this website?',
+        text: `Navigating to ${url}...`,
         sessionId
       }
     });
     return;
   }
   
-  if (text.toLowerCase().includes('help')) {
+  // Handle help command directly
+  if (lowerText === 'help') {
     sendResponse({
       type: 'MESSAGE',
       payload: {
@@ -80,25 +119,90 @@ function handleUserMessage(
     return;
   }
   
-  if (text.toLowerCase().includes('search') || text.toLowerCase().includes('find')) {
-    const query = text.replace(/search for|find|search/gi, '').trim();
+  // For all other messages, try to use OpenAI
+  try {
+    // Check if OpenAI is initialized
+    if (!openai) {
+      const initialized = await initializeOpenAI();
+      if (!initialized) {
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: 'Please set your OpenAI API key in the extension settings to enable AI responses.',
+            sessionId
+          }
+        });
+        return;
+      }
+    }
+    
+    // Get page information to provide context to OpenAI
+    const pageInfo = await getPageInfo(sender.tab?.id);
+    
+    // Prepare message for OpenAI
+    const messages = [
+      {
+        role: 'system',
+        content: `You are ChatBrowse, an AI assistant that helps users browse the web. You are currently on a webpage with title: "${pageInfo?.title || 'Unknown'}" and URL: "${pageInfo?.url || 'Unknown'}". Keep responses concise and helpful for web browsing.`
+      },
+      {
+        role: 'user',
+        content: text
+      }
+    ];
+    
+    // Send to OpenAI
+    if (openai) {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: messages,
+        max_tokens: 500
+      });
+      
+      // Get response
+      const aiResponse = completion.choices[0].message.content;
+      
+      // Send response back to the user
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: aiResponse,
+          sessionId
+        }
+      });
+    } else {
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: 'Unable to initialize OpenAI. Please check your API key in settings.',
+          sessionId
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error calling OpenAI:', error);
     sendResponse({
       type: 'MESSAGE',
       payload: {
-        text: `Searching for "${query}" on this page...`,
+        text: `I encountered an error while processing your request. ${(error as Error).message || 'Please try again or check your API key.'}`,
         sessionId
       }
     });
-    return;
   }
+}
+
+// Helper function to get page information
+async function getPageInfo(tabId?: number): Promise<PageInfo | null> {
+  if (!tabId) return null;
   
-  // Default response - avoiding setTimeout which can cause issues in service workers
-  sendResponse({
-    type: 'MESSAGE',
-    payload: {
-      text: `I received your message: "${text}". How else can I help?`,
-      sessionId
-    }
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_PAGE_INFO' }, (pageInfo: PageInfo) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(pageInfo);
+    });
   });
 }
 

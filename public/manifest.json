@@ -6,6 +6,10 @@
   "action": {
     "default_popup": "popup.html"
   },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
   "permissions": [
     "activeTab",
     "storage"

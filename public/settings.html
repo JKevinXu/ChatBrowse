@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ChatBrowse Settings</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+    .message {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <h1>ChatBrowse Settings</h1>
+  
+  <div class="form-group">
+    <label for="apiKey">OpenAI API Key</label>
+    <input type="text" id="apiKey" placeholder="Enter your OpenAI API key">
+    <small>Your API key is stored locally and never sent to our servers.</small>
+  </div>
+  
+  <div class="form-group">
+    <label for="theme">Theme</label>
+    <select id="theme">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="fontSize">Font Size</label>
+    <select id="fontSize">
+      <option value="small">Small</option>
+      <option value="medium">Medium</option>
+      <option value="large">Large</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label>
+      <input type="checkbox" id="showNotifications">
+      Show Notifications
+    </label>
+  </div>
+  
+  <button id="saveButton">Save Settings</button>
+  
+  <div id="message" class="message" style="display: none;"></div>
+  
+  <script src="settings.js"></script>
+</body>
+</html> 
