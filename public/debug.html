@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatBrowse Debug</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      line-height: 1.5;
+    }
+    
+    h1 {
+      color: #333;
+    }
+    
+    .debug-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    
+    button {
+      padding: 8px 12px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    button:hover {
+      background-color: #3367d6;
+    }
+    
+    #status-display {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .success {
+      color: green;
+    }
+    
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>ChatBrowse Extension Debug</h1>
+  
+  <div class="debug-section">
+    <h2>Extension Status</h2>
+    <button id="check-status">Check Extension Status</button>
+    <button id="check-openai">Check OpenAI Status</button>
+    <div id="status-display">Status information will appear here...</div>
+  </div>
+  
+  <div class="debug-section">
+    <h2>Message Tests</h2>
+    <button id="ping-background">Ping Background Script</button>
+    <button id="test-summarize">Test Summarize Request</button>
+    <button id="test-openai">Test OpenAI Connection</button>
+  </div>
+  
+  <div class="debug-section">
+    <h2>Tips for Debugging</h2>
+    <p>
+      <strong>Background script logs:</strong> Open chrome://extensions, enable Developer Mode, 
+      find ChatBrowse, click "inspect views: background.html" to see background script logs.
+    </p>
+    <p>
+      <strong>Content script logs:</strong> Right-click on a page where the extension is active,
+      select "Inspect" and check the Console tab.
+    </p>
+  </div>
+
+  <script src="debug.js"></script>
+</body>
+</html> 

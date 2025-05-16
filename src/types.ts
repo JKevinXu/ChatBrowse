@@ -15,7 +15,7 @@ export interface ChatSession {
 }
 
 export interface ChatCommand {
-  type: 'SEND_MESSAGE' | 'CLEAR_CHAT' | 'NAVIGATE' | 'EXTRACT_INFO';
+  type: 'SEND_MESSAGE' | 'CLEAR_CHAT' | 'NAVIGATE' | 'EXTRACT_INFO' | 'SET_CONTEXT' | 'CONTENT_SCRIPT_READY';
   payload: any;
 }
 
@@ -28,6 +28,7 @@ export interface PageInfo {
   url: string;
   title: string;
   content?: string;
+  useAsContext?: boolean;
 }
 
 export interface StorageData {

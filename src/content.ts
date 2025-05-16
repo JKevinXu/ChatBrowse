@@ -3,20 +3,46 @@ import { createChatSession, createMessage, extractPageInfo, processCommand } fro
 
 let currentSession: ChatSession | null = null;
 let chatContainer: HTMLElement | null = null;
+let lastExtractedPageInfo: ReturnType<typeof extractPageInfo> | null = null;
 
 // Initialize when the content script is loaded
 function initialize() {
-  console.log('ChatBrowse content script initialized');
+  console.log('ChatBrowse content script initializing...');
   
-  // Create the chat interface
-  createChatInterface();
-  
-  // Initialize a new chat session for this page
-  const { title, url } = extractPageInfo();
-  currentSession = createChatSession(url, title);
-  
-  // Set up message listeners
-  setupMessageListeners();
+  try {
+    // Create the chat interface
+    createChatInterface();
+    
+    // Initialize a new chat session for this page
+    const pageInfo = extractPageInfo();
+    lastExtractedPageInfo = pageInfo;
+    const { title, url } = pageInfo;
+    
+    // Debug log the page info that will be used for the session
+    console.log('DEBUG: Initial page info extraction results:');
+    console.log('DEBUG: - Title:', title);
+    console.log('DEBUG: - URL:', url);
+    console.log('DEBUG: - Content length:', pageInfo.content.length);
+    
+    currentSession = createChatSession(url, title);
+    
+    // Set up message listeners
+    setupMessageListeners();
+    
+    // Indicate the content script is ready by sending a message to the background script
+    // Include full page info with content to ensure background script has it cached
+    console.log('CONTENT: Sending CONTENT_SCRIPT_READY message to background');
+    chrome.runtime.sendMessage({ 
+      type: 'CONTENT_SCRIPT_READY', 
+      payload: pageInfo 
+    }, response => {
+      console.log('CONTENT: Received response from background for CONTENT_SCRIPT_READY:', response);
+    });
+    
+    console.log('ChatBrowse content script initialized successfully');
+  } catch (error) {
+    console.error('Error initializing ChatBrowse content script:', error);
+  }
 }
 
 // Create and inject the chat interface
@@ -166,7 +192,51 @@ function handleUserInput(inputElement: HTMLInputElement) {
     return;
   }
   
+  // New: Handle set context command
+  if (command === 'setcontext') {
+    // Extract page info
+    const pageInfo = extractPageInfo();
+    lastExtractedPageInfo = pageInfo;
+    
+    // Set the context flag
+    const useAsContext = args.toLowerCase() === 'on' || args.toLowerCase() === 'true' || args === '';
+    pageInfo.useAsContext = useAsContext;
+    
+    // Send to background script
+    chrome.runtime.sendMessage(
+      {
+        type: 'SET_CONTEXT',
+        payload: pageInfo
+      },
+      (response) => {
+        if (response && response.type === 'MESSAGE') {
+          const statusMessage = createMessage(
+            response.payload.text,
+            'system'
+          );
+          addMessageToChat(statusMessage);
+        } else if (response && response.type === 'ERROR') {
+          const errorMessage = createMessage(
+            `Error: ${response.payload.message || 'Failed to set context'}`,
+            'system'
+          );
+          addMessageToChat(errorMessage);
+        }
+      }
+    );
+    
+    // Add a waiting message
+    const waitingMessage = createMessage(
+      useAsContext ? 'Setting current page content as chat context...' : 'Removing page content from chat context...',
+      'system'
+    );
+    addMessageToChat(waitingMessage);
+    return;
+  }
+  
   // Standard chat message
+  console.log('CONTENT: Sending SEND_MESSAGE to background with text:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+  
   chrome.runtime.sendMessage(
     {
       type: 'SEND_MESSAGE',
@@ -176,6 +246,8 @@ function handleUserInput(inputElement: HTMLInputElement) {
       }
     },
     (response) => {
+      console.log('CONTENT: Received response from background for SEND_MESSAGE:', response ? response.type : 'no response');
+      
       if (response && response.type === 'MESSAGE') {
         const systemMessage = createMessage(response.payload.text, 'system');
         addMessageToChat(systemMessage);
@@ -185,12 +257,17 @@ function handleUserInput(inputElement: HTMLInputElement) {
           currentSession.messages.push(systemMessage);
           currentSession.updatedAt = Date.now();
         }
+      } else {
+        console.log('CONTENT: Unexpected or missing response:', response);
+        // Add error message to chat
+        const errorMessage = createMessage('Error: Failed to get a response from the assistant. Please try again.', 'system');
+        addMessageToChat(errorMessage);
       }
     }
   );
 }
 
-// Add a message to the chat UI
+// Add a message to the chat interface
 function addMessageToChat(message: Message) {
   const messagesContainer = document.getElementById('chatbrowse-messages');
   if (!messagesContainer) return;
@@ -198,31 +275,81 @@ function addMessageToChat(message: Message) {
   const messageElement = document.createElement('div');
   messageElement.className = `chatbrowse-message ${message.sender}`;
   messageElement.textContent = message.text;
-  messageElement.dataset.id = message.id;
-  
   messagesContainer.appendChild(messageElement);
+  
+  // Scroll to the new message
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 // Set up listeners for messages from background script
 function setupMessageListeners() {
+  // Debug all messaging activity
+  console.log('DEBUG: Setting up content script message listeners');
+  
+  // Add a global message listener to debug all incoming messages
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    console.log('DEBUG GLOBAL LISTENER: Content script received message:', 
+      typeof message === 'object' ? message.type || 'unknown type' : typeof message);
+    return false; // Allow other listeners to process
+  });
+  
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('DEBUG: Content script received message:', message.type);
+    
     if (message.type === 'EXTRACT_PAGE_INFO') {
-      sendResponse(extractPageInfo());
+      console.log('Content script received EXTRACT_PAGE_INFO request');
+      
+      try {
+        // Try to extract fresh info first
+        const pageInfo = extractPageInfo();
+        lastExtractedPageInfo = pageInfo;
+        
+        console.log('Extracted page info for background script:');
+        console.log('- Title:', pageInfo.title);
+        console.log('- URL:', pageInfo.url);
+        console.log('- Content length:', pageInfo.content.length);
+        
+        // Ensure all fields are present before sending
+        const response = {
+          title: pageInfo.title || document.title || 'Unknown Title',
+          url: pageInfo.url || window.location.href || 'Unknown URL',
+          content: pageInfo.content || 'No content extracted'
+        };
+        
+        console.log('DEBUG: Sending page info to background with title:', response.title);
+        sendResponse(response);
+      } catch (error) {
+        console.error('Error extracting page info:', error);
+        
+        // Try to use last extracted info if available
+        if (lastExtractedPageInfo) {
+          console.log('Using last successfully extracted page info instead');
+          sendResponse(lastExtractedPageInfo);
+          return true;
+        }
+        
+        // Even on error, send a response with basic info
+        sendResponse({
+          title: document.title || 'Unknown Title',
+          url: window.location.href || 'Unknown URL',
+          content: 'Error extracting content: ' + (error as Error).message
+        });
+      }
+      
       return true;
     }
     
     if (message.type === 'CLEAR_CHAT') {
       clearChat();
       sendResponse({ success: true });
-      return false;
+      return true;
     }
     
     return false;
   });
 }
 
-// Clear the chat
+// Clear the chat messages
 function clearChat() {
   const messagesContainer = document.getElementById('chatbrowse-messages');
   if (messagesContainer) {
@@ -230,14 +357,10 @@ function clearChat() {
   }
   
   if (currentSession) {
-    // Keep only the welcome message
-    const welcomeMessage = currentSession.messages.find(m => 
-      m.sender === 'system' && m.text.includes('Welcome to ChatBrowse'));
-    
-    currentSession.messages = welcomeMessage ? [welcomeMessage] : [];
+    currentSession.messages = [];
     currentSession.updatedAt = Date.now();
   }
 }
 
-// Initialize the content script
+// Initialize when the content script is loaded
 initialize(); 

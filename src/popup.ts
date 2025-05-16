@@ -104,33 +104,41 @@ function handleSendMessage() {
     console.error('Failed to save session:', err);
   });
   
-  // Send to background script for processing
-  chrome.runtime.sendMessage(
-    {
-      type: 'SEND_MESSAGE',
-      payload: {
-        text,
-        sessionId: currentSession.id
-      }
-    },
-    (response) => {
-      if (response && response.type === 'MESSAGE') {
-        const systemMessage = createMessage(response.payload.text, 'system');
-        addMessageToChat(systemMessage);
-        
-        // Update session with system response
-        if (currentSession) {
-          currentSession.messages.push(systemMessage);
-          currentSession.updatedAt = Date.now();
+  // Get current active tab and then send message
+  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    const activeTab = tabs[0];
+    
+    // Send to background script for processing
+    chrome.runtime.sendMessage(
+      {
+        type: 'SEND_MESSAGE',
+        payload: {
+          text,
+          sessionId: currentSession.id,
+          tabId: activeTab.id, // Include the active tab ID
+          tabUrl: activeTab.url,
+          tabTitle: activeTab.title
+        }
+      },
+      (response) => {
+        if (response && response.type === 'MESSAGE') {
+          const systemMessage = createMessage(response.payload.text, 'system');
+          addMessageToChat(systemMessage);
           
-          // Save updated session
-          saveToStorage(`session_${currentSession.id}`, currentSession).catch(err => {
-            console.error('Failed to save session after system response:', err);
-          });
+          // Update session with system response
+          if (currentSession) {
+            currentSession.messages.push(systemMessage);
+            currentSession.updatedAt = Date.now();
+            
+            // Save updated session
+            saveToStorage(`session_${currentSession.id}`, currentSession).catch(err => {
+              console.error('Failed to save session after system response:', err);
+            });
+          }
         }
       }
-    }
-  );
+    );
+  });
 }
 
 // Add a message to the chat UI
