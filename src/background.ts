@@ -16,34 +16,23 @@ const contentScriptReadyTabs = new Set<number>();
 
 // Initialize OpenAI with API key
 async function initializeOpenAI(): Promise<boolean> {
-  console.log('BACKGROUND: initializeOpenAI function called', new Date().toISOString());
-  
   try {
-    console.log('BACKGROUND: Attempting to load settings from storage');
     const settings = await loadFromStorage<StorageData['settings']>('settings');
     if (settings && settings.openaiApiKey) {
       openai = new OpenAI({
         apiKey: settings.openaiApiKey,
-        dangerouslyAllowBrowser: true // Required for Chrome extension
+        dangerouslyAllowBrowser: true
       });
-      console.log('BACKGROUND: OpenAI initialized successfully');
       return true;
-    } else {
-      console.log('BACKGROUND: OpenAI API key not found in settings');
-      return false;
     }
+    return false;
   } catch (error) {
-    console.error('BACKGROUND ERROR - Failed to initialize OpenAI:', error);
     return false;
   }
 }
 
 // Initialize the extension when installed
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log('BACKGROUND: ChatBrowse extension installed', details.reason);
-  console.log('BACKGROUND: Installation time:', new Date().toISOString());
-  
-  // Initialize default settings
   const defaultSettings = {
     theme: 'light',
     fontSize: 'medium',
@@ -51,57 +40,19 @@ chrome.runtime.onInstalled.addListener((details) => {
     openaiApiKey: ''
   };
   
-  saveToStorage('settings', defaultSettings).catch(err => {
-    console.error('BACKGROUND: Failed to save default settings:', err);
-  });
-
-  // Initialize OpenAI
+  saveToStorage('settings', defaultSettings);
   initializeOpenAI();
-  
-  // Log for debug purposes
-  console.log('BACKGROUND: Event listener setup starting...');
 });
-
-// Basic logging to verify the script is loading
-console.log('BACKGROUND SCRIPT LOADED');
-console.log('TIME:', new Date().toISOString());
-
-// Explicitly check if OpenAI is initialized right at startup
-console.log('BACKGROUND: Initial OpenAI instance status:', openai ? 'INITIALIZED' : 'NOT INITIALIZED');
-
-// Manually trigger OpenAI initialization to check if function works
-console.log('BACKGROUND: Manually triggering OpenAI initialization');
-initializeOpenAI().then(success => {
-  console.log('BACKGROUND: Manual OpenAI initialization result:', success ? 'SUCCESS' : 'FAILED');
-  console.log('BACKGROUND: OpenAI instance after manual init:', openai ? 'EXISTS' : 'NULL');
-}).catch(err => {
-  console.error('BACKGROUND: Error during manual OpenAI initialization:', err);
-});
-
-// Add ping system to keep service worker alive and check it's running
-setInterval(() => {
-  console.log('BACKGROUND PING:', new Date().toISOString());
-  // Also check OpenAI status on each ping
-  console.log('BACKGROUND: OpenAI instance status on ping:', openai ? 'INITIALIZED' : 'NOT INITIALIZED');
-}, 10000);
-
-// Create a variable to track if we're receiving messages
-let receivedMessages = 0;
 
 // Listen for settings changes
 chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.StorageChange }, namespace: string) => {
-  console.log('BACKGROUND: Storage changed event, namespace:', namespace);
-  console.log('BACKGROUND: Changes:', Object.keys(changes).join(', '));
-  
   if (namespace === 'local' && changes.settings) {
-    console.log('BACKGROUND: Settings changed, re-initializing OpenAI');
-    // Re-initialize OpenAI with new settings
     initializeOpenAI();
   }
 });
 
-// Add log to help with debugging
-console.log('BACKGROUND: Setting up main message listener');
+// Create a variable to track if we're receiving messages
+let receivedMessages = 0;
 
 // Track which tabs have content scripts ready and automatically set context
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -109,13 +60,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'CONTENT_SCRIPT_READY' && sender.tab?.id) {
     const tabId = sender.tab.id;
     contentScriptReadyTabs.add(tabId);
-    console.log(`BACKGROUND: Content script ready in tab ${tabId}`);
-    console.log('BACKGROUND: Content script ready payload:', message.payload);
     
     // Automatically request page info and set as context
     getPageInfo(tabId).then(pageInfo => {
       if (pageInfo && pageInfo.title && pageInfo.url && pageInfo.content) {
-        // Set the context automatically
         currentPageContext = {
           tabId,
           pageInfo: {
@@ -125,11 +73,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             useAsContext: true
           }
         };
-        console.log(`BACKGROUND: Automatically set page context for tab ${tabId}`);
       }
     });
     
-    // Send acknowledgment
     sendResponse({ received: true, status: 'acknowledged' });
     return true;
   }
@@ -138,23 +84,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'SEND_MESSAGE':
       handleUserMessage(message.payload, sender, sendResponse);
-      return true; // Keep the message channel open for async response
+      return true;
       
     case 'NAVIGATE':
       handleNavigation(message.payload, sender, sendResponse);
-      return false; // No async response needed
+      return false;
       
     case 'EXTRACT_INFO':
       handleExtraction(sender, sendResponse);
-      return true; // Keep the message channel open for async response
+      return true;
       
     case 'CLEAR_CHAT':
       handleClearChat(sender.tab?.id, sendResponse);
-      return false; // No async response needed
+      return false;
       
     case 'SET_CONTEXT':
       handleSetContext(message.payload, sender, sendResponse);
-      return false; // No async response needed
+      return false;
       
     default:
       sendResponse({
