@@ -1,0 +1,9 @@
+{
+  "name": "com.chatbrowse.mcp",
+  "description": "ChatBrowse MCP Server for web browsing automation",
+  "path": "PLACEHOLDER_PATH_TO_WRAPPER_SCRIPT",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://PLACEHOLDER_EXTENSION_ID/"
+  ]
+} 
