@@ -34,8 +34,6 @@ async function initializeOpenAI(): Promise<boolean> {
 // Initialize the extension when installed
 chrome.runtime.onInstalled.addListener((details) => {
   const defaultSettings = {
-    theme: 'light',
-    fontSize: 'medium',
     showNotifications: true,
     openaiApiKey: ''
   };

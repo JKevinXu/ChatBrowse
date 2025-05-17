@@ -35,8 +35,6 @@ export interface StorageData {
   sessions: Record<string, ChatSession>;
   settings: {
     openaiApiKey?: string;
-    theme: 'light' | 'dark';
-    fontSize: 'small' | 'medium' | 'large';
     showNotifications: boolean;
   };
 } 

@@ -2,29 +2,34 @@ import { loadFromStorage, saveToStorage } from './utils';
 
 interface Settings {
   openaiApiKey?: string;
-  theme?: 'light' | 'dark';
-  fontSize?: 'small' | 'medium' | 'large';
   showNotifications?: boolean;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const apiKeyInput = document.getElementById('apiKey') as HTMLInputElement;
-  const themeSelect = document.getElementById('theme') as HTMLSelectElement;
-  const fontSizeSelect = document.getElementById('fontSize') as HTMLSelectElement;
-  const showNotificationsCheckbox = document.getElementById('showNotifications') as HTMLInputElement;
-  const saveButton = document.getElementById('saveButton') as HTMLButtonElement;
-  const messageDiv = document.getElementById('message') as HTMLDivElement;
+  const apiKeyInput = document.getElementById('apiKey') as HTMLInputElement | null;
+  const showNotificationsCheckbox = document.getElementById('showNotifications') as HTMLInputElement | null;
+  const saveButton = document.getElementById('saveButton') as HTMLButtonElement | null;
+  const messageDiv = document.getElementById('message') as HTMLDivElement | null;
+
+  // Check if elements exist
+  if (!apiKeyInput || !showNotificationsCheckbox || !saveButton || !messageDiv) {
+    console.error('One or more required elements not found in the DOM');
+    return;
+  }
 
   // Load current settings
   try {
     const settings = await loadFromStorage<Settings>('settings');
     if (settings) {
       apiKeyInput.value = settings.openaiApiKey || '';
-      themeSelect.value = settings.theme || 'light';
-      fontSizeSelect.value = settings.fontSize || 'medium';
       showNotificationsCheckbox.checked = settings.showNotifications !== false;
+    } else {
+      // Default settings if none exist
+      showNotificationsCheckbox.checked = true;
     }
   } catch (error) {
+    // Set defaults on error
+    showNotificationsCheckbox.checked = true;
     showMessage('Error loading settings: ' + (error as Error).message, 'error');
   }
 
@@ -32,8 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   saveButton.addEventListener('click', async () => {
     const newSettings: Settings = {
       openaiApiKey: apiKeyInput.value.trim(),
-      theme: themeSelect.value as 'light' | 'dark',
-      fontSize: fontSizeSelect.value as 'small' | 'medium' | 'large',
       showNotifications: showNotificationsCheckbox.checked
     };
 
@@ -46,12 +49,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function showMessage(text: string, type: 'success' | 'error') {
+    if (!messageDiv) return;
+    
     messageDiv.textContent = text;
     messageDiv.className = 'message ' + type;
     messageDiv.style.display = 'block';
     
     setTimeout(() => {
-      messageDiv.style.display = 'none';
+      if (messageDiv) {
+        messageDiv.style.display = 'none';
+      }
     }, 3000);
   }
 }); 
