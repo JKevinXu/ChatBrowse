@@ -87,25 +87,38 @@ try {
 
   // Read message from Chrome's native messaging
   process.stdin.on('readable', () => {
-    // console.error('NATIVE_BRIDGE_LOG: stdin readable');
-    // Read 4 bytes (message length)
-    const header = process.stdin.read(4);
-    if (!header) return;
-    
-    // Determine message length
-    const messageLength = header.readUInt32LE(0);
-    
-    // Read the message
-    const messageBuffer = process.stdin.read(messageLength);
-    if (!messageBuffer) return;
-    
-    // Parse the message
     try {
-      const message = JSON.parse(messageBuffer.toString());
+      console.error('NATIVE_BRIDGE_LOG: stdin readable event triggered.');
+      const header = process.stdin.read(4);
+      if (!header) {
+        console.error('NATIVE_BRIDGE_LOG: stdin read(4) returned null (no header).');
+        return;
+      }
+      console.error(`NATIVE_BRIDGE_LOG: Read header, length ${header.length}`);
+      
+      const messageLength = header.readUInt32LE(0);
+      console.error(`NATIVE_BRIDGE_LOG: Message length from header: ${messageLength}`);
+      
+      const messageBuffer = process.stdin.read(messageLength);
+      if (!messageBuffer) {
+        console.error('NATIVE_BRIDGE_LOG: stdin read(messageLength) returned null (no messageBuffer).');
+        return;
+      }
+      console.error(`NATIVE_BRIDGE_LOG: Read messageBuffer, length ${messageBuffer.length}`);
+      
+      const messageStr = messageBuffer.toString();
+      console.error(`NATIVE_BRIDGE_LOG: Received message string: ${messageStr}`);
+      const message = JSON.parse(messageStr);
+      console.error('NATIVE_BRIDGE_LOG: Parsed message JSON:', message);
       handleMessage(message);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      sendMessageToChrome({ success: false, error: `NATIVE_BRIDGE_LOG: Failed to parse message: ${errorMessage}` });
+    } catch (e: any) {
+      const readableErrorMsg = `NATIVE_BRIDGE_LOG: CRITICAL ERROR in stdin readable handler: ${e.message}`;
+      console.error(readableErrorMsg);
+      try {
+        sendMessageToChrome({ success: false, error: readableErrorMsg });
+      } catch (sendError: any) {
+        console.error(`NATIVE_BRIDGE_LOG: Failed to send critical readable error to Chrome: ${sendError.message}`);
+      }
     }
   });
 
@@ -121,36 +134,53 @@ try {
 
 // Handle incoming message
 function handleMessage(message: any): void {
+  console.error('NATIVE_BRIDGE_LOG: handleMessage called with:', message); 
   if (!mcpServerInstance || !mcpServerInstance.stdin || mcpServerInstance.stdin.destroyed) { 
     console.error('NATIVE_BRIDGE_LOG: mcpServerInstance or mcpServerInstance.stdin not available in handleMessage');
     sendMessageToChrome({ success: false, error: 'NATIVE_BRIDGE_LOG: MCP server stdin not available.' });
     return;
   }
-  // Convert the message to an MCP format
-  if (message.type === 'browse') {
-    // Format for the browse_webpage MCP call
+
+  // Check for the structure sent by mcp-client.ts
+  if (message.method === 'tool' && message.params && message.params.name === 'browse_webpage') {
+    const parameters = message.params.parameters || {};
+    const url = parameters.url;
+    const selector = parameters.selector;
+
+    if (!url) {
+      sendMessageToChrome({
+        success: false,
+        error: 'NATIVE_BRIDGE_LOG: browse_webpage tool call missing URL parameter.'
+      });
+      return;
+    }
+
+    // Format for the browse_webpage MCP call (this part is actually correct for index.js)
     const mcpMessage = {
       method: 'tool',
       params: {
         name: 'browse_webpage',
         parameters: {
-          url: message.url,
-          selector: message.selector
+          url: url,
+          selector: selector
         }
       }
     };
     
-    // Send to MCP server
     try {
-      mcpServerInstance.stdin.write(JSON.stringify(mcpMessage) + '\\n');
+      const mcpMessageString = JSON.stringify(mcpMessage) + '\n'; 
+      console.error(`NATIVE_BRIDGE_LOG: Writing to MCP server stdin: ${mcpMessageString.trim()}`); 
+      mcpServerInstance.stdin.write(mcpMessageString);
+      console.error('NATIVE_BRIDGE_LOG: Successfully wrote to MCP server stdin.'); 
     } catch (e:any) {
       console.error(`NATIVE_BRIDGE_LOG: Error writing to mcpServerInstance.stdin: ${e.message}`);
       sendMessageToChrome({ success: false, error: `NATIVE_BRIDGE_LOG: Error writing to MCP server: ${e.message}` });
     }
   } else {
+    let receivedType = message.type !== undefined ? message.type : (message.method !== undefined ? message.method : 'unknown_structure');
     sendMessageToChrome({ 
       success: false, 
-      error: `NATIVE_BRIDGE_LOG: Unknown message type: ${message.type}` 
+      error: `NATIVE_BRIDGE_LOG: Unknown message structure or type received. Type/Method: ${receivedType}` 
     });
   }
 }

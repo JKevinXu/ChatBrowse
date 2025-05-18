@@ -12,7 +12,7 @@ import { execSync } from 'child_process';
 import * as os from 'os';
 
 // Constants
-const EXTENSION_ID = 'PLACEHOLDER_EXTENSION_ID'; // Replace with your actual extension ID
+const EXTENSION_ID = 'ndgnodlfblkobilohbgblmgimnnpgeop'; // Replace with your actual extension ID
 const NATIVE_HOST_NAME = 'com.chatbrowse.mcp';
 
 // Current directory
@@ -22,22 +22,24 @@ async function install() {
   console.log('Installing ChatBrowse MCP Server...');
   
   try {
-    // Get the absolute path to the native bridge script
-    const bridgePath = path.resolve(__dirname, 'native-bridge.js');
+    const wrapperScriptName = 'run-native-bridge.sh';
+    const wrapperPath = path.resolve(__dirname, wrapperScriptName); 
     
-    // Make it executable
-    await fs.chmod(bridgePath, '755');
+    try {
+        await fs.chmod(wrapperPath, '755');
+    } catch (chmodError: any) {
+        console.warn(`Warning: Could not chmod ${wrapperPath}. Error: ${chmodError.message}. This might be okay if already set or on Windows.`);
+    }
     
-    // Create manifest file
     const manifest = {
       name: NATIVE_HOST_NAME,
       description: 'ChatBrowse MCP Server for web automation',
-      path: bridgePath,
+      path: wrapperPath, 
       type: 'stdio',
       allowed_origins: [`chrome-extension://${EXTENSION_ID}/`]
     };
     
-    // Determine where to install based on platform
+    // Determine where to install based on platform (original logic restored)
     const platform = os.platform();
     let manifestPath: string;
     
@@ -51,17 +53,19 @@ async function install() {
       manifestPath = path.join(manifestDir, `${NATIVE_HOST_NAME}.json`);
     } 
     else if (platform === 'win32') { // Windows
+      // For Windows, the manifest path is usually determined via registry, 
+      // but writing it beside the executable and registering that path is common.
+      // Here we assume install.js is in dist/, so manifest will be in dist/ too.
       manifestPath = path.join(__dirname, `${NATIVE_HOST_NAME}.json`);
-      
-      // Add registry key
-      const regCmd = `REG ADD "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${NATIVE_HOST_NAME}" /ve /t REG_SZ /d "${manifestPath.replace(/\\/g, '\\\\')}" /f`;
-      execSync(regCmd);
+      const regKey = `HKCU\Software\Google\Chrome\NativeMessagingHosts\${NATIVE_HOST_NAME}`;
+      const regCommand = `REG ADD "${regKey}" /ve /t REG_SZ /d "${manifestPath.replace(/\\/g, '\\\\')}" /f`;
+      execSync(regCommand);
     } 
     else if (platform === 'linux') { // Linux
       const userHome = os.homedir();
       const manifestDir = path.join(
         userHome,
-        '.config/google-chrome/NativeMessagingHosts'
+        '.config/google-chrome/NativeMessagingHosts' // Or .config/chromium/NativeMessagingHosts
       );
       await fs.mkdir(manifestDir, { recursive: true });
       manifestPath = path.join(manifestDir, `${NATIVE_HOST_NAME}.json`);
@@ -70,17 +74,15 @@ async function install() {
       throw new Error(`Unsupported platform: ${platform}`);
     }
     
-    // Write manifest file
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     
     console.log(`Native messaging host registered successfully at: ${manifestPath}`);
     console.log('Installation complete! The MCP server is now ready to use with ChatBrowse.');
     
-  } catch (error) {
-    console.error('Installation failed:', error);
+  } catch (error: any) {
+    console.error(`Installation failed: ${error.message}`);
     process.exit(1);
   }
 }
 
-// Run installation
-install(); 
+install();

@@ -1,8 +1,11 @@
+console.log('BACKGROUND SCRIPT STARTING');
+console.log('chrome.runtime object:', JSON.stringify(Object.keys(chrome.runtime || {})));
+
 import { ChatCommand, ChatResponse, PageInfo, StorageData } from './types';
 import { saveToStorage, loadFromStorage } from './utils';
 import OpenAI from 'openai';
+import { mcpClient } from './mcp-client';
 
-// Store OpenAI instance
 let openai: OpenAI | null = null;
 
 // Track page context for LLM
@@ -53,9 +56,10 @@ chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.StorageCh
 let receivedMessages = 0;
 
 // Track which tabs have content scripts ready and automatically set context
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Handle content script ready notification
-  if (message.type === 'CONTENT_SCRIPT_READY' && sender.tab?.id) {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('BACKGROUND: Received message:', request, 'from sender:', sender);
+
+  if (request.type === 'CONTENT_SCRIPT_READY' && sender.tab?.id) {
     const tabId = sender.tab.id;
     contentScriptReadyTabs.add(tabId);
     
@@ -79,13 +83,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   // Process different command types
-  switch (message.type) {
+  switch (request.type) {
     case 'SEND_MESSAGE':
-      handleUserMessage(message.payload, sender, sendResponse);
+      handleUserMessage(request.payload, sender, sendResponse);
       return true;
       
     case 'NAVIGATE':
-      handleNavigation(message.payload, sender, sendResponse);
+      const url = request.payload?.url;
+      if (url) {
+        console.log(`BACKGROUND: NAVIGATE command received for URL: ${url}`);
+        // Update UI immediately
+        chrome.runtime.sendMessage({ command: 'UPDATE_POPUP_UI', data: { anwser: `Navigating to ${url}...` } });
+        
+        // Call MCP client to browse the webpage
+        console.log(`BACKGROUND: Calling mcpClient.browseWebpage with URL: ${url}`);
+        mcpClient.browseWebpage(url)
+          .then((data: any) => {
+            console.log('BACKGROUND: MCP browse success:', JSON.stringify(data));
+            if (sendResponse) sendResponse({ type: 'NAVIGATE_SUCCESS', payload: data });
+          })
+          .catch((error: any) => {
+            console.error('BACKGROUND: MCP browse error:', error);
+            if (sendResponse) sendResponse({ type: 'NAVIGATE_ERROR', payload: { message: error.message || String(error) } });
+          });
+      } else {
+        console.error('BACKGROUND: NAVIGATE message received without URL in payload.');
+        if (sendResponse) sendResponse({ type: 'NAVIGATE_ERROR', payload: { message: 'Navigate command missing URL.' }});
+      }
       return false;
       
     case 'EXTRACT_INFO':
@@ -97,7 +121,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
       
     case 'SET_CONTEXT':
-      handleSetContext(message.payload, sender, sendResponse);
+      handleSetContext(request.payload, sender, sendResponse);
       return false;
       
     default:
@@ -167,12 +191,17 @@ async function handleUserMessage(
   sender: chrome.MessageSender,
   sendResponse: (response: ChatResponse) => void
 ) {
-  // Process commands for navigation, extraction, etc.
   const lowerText = text.toLowerCase().trim();
   
-  // Handle simple navigation commands directly
   if (lowerText.startsWith('go to ') || lowerText.startsWith('navigate to ')) {
-    const url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
+    let url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
+    // Basic URL validation and normalization
+    if (!url.match(/^\w+:\/\//)) {
+      url = 'http://' + url; // Default to http if no scheme
+    }
+    console.log(`BACKGROUND (handleUserMessage): Detected navigation command to URL: ${url}`);
+
+    // Send immediate feedback to UI
     sendResponse({
       type: 'MESSAGE',
       payload: {
@@ -180,7 +209,22 @@ async function handleUserMessage(
         sessionId
       }
     });
-    return;
+
+    // Call MCP client to browse the webpage
+    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.browseWebpage with URL: ${url}`);
+    mcpClient.browseWebpage(url)
+      .then(response => {
+        console.log('BACKGROUND (handleUserMessage): mcpClient.browseWebpage response:', response);
+        // Optionally, send another message to UI upon completion/failure if needed,
+        // for now, mcpClient logs errors, and success might be implicit by page change.
+        // Example: chrome.runtime.sendMessage({ command: 'UPDATE_POPUP_UI', data: { answer: response.success ? `Successfully navigated to ${url}` : `Failed to navigate: ${response.error}` } });
+      })
+      .catch(error => {
+        console.error('BACKGROUND (handleUserMessage): mcpClient.browseWebpage error:', error);
+        // Optionally, send error to UI
+        // Example: chrome.runtime.sendMessage({ command: 'UPDATE_POPUP_UI', data: { answer: `Error navigating: ${error.message}` } });
+      });
+    return; // Still return, as sendResponse was called for initial feedback.
   }
   
   // Handle help command directly

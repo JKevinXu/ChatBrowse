@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const SRC_DIR = path.join(__dirname, '../src');
 const DIST_DIR = path.join(__dirname, '../dist');
 const SHEBANG = '#!/usr/bin/env node\n';
 
@@ -50,6 +51,25 @@ for (const file of executableFiles) {
   } else {
     console.warn(`Warning: Expected file ${file} not found`);
   }
+}
+
+// Copy and chmod the wrapper script
+const wrapperScriptName = 'run-native-bridge.sh';
+const srcWrapperPath = path.join(SRC_DIR, wrapperScriptName);
+const distWrapperPath = path.join(DIST_DIR, wrapperScriptName);
+
+if (fs.existsSync(srcWrapperPath)) {
+  console.log(`Copying ${wrapperScriptName} to dist directory.`);
+  fs.copyFileSync(srcWrapperPath, distWrapperPath);
+  console.log(`Making ${wrapperScriptName} executable.`);
+  try {
+    execSync(`chmod +x "${distWrapperPath}"`);
+    console.log(`Made ${wrapperScriptName} executable.`);
+  } catch (error) {
+    console.log(`Note: Could not make ${wrapperScriptName} executable. This is normal on Windows.`);
+  }
+} else {
+  console.warn(`Warning: Wrapper script ${wrapperScriptName} not found in src.`);
 }
 
 console.log('Post-build process complete!');
