@@ -1,0 +1,10 @@
+{
+  "name": "com.chatbrowse.mcp",
+  "description": "ChatBrowse MCP Server for web automation",
+  "path": "/opt/homebrew/bin/node",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://*"
+  ],
+  "args": ["/Users/kx/ws/ChatBrowse/mcp-server/dist/native-bridge.js"]
+} 
