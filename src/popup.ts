@@ -79,6 +79,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (userInput) {
     userInput.focus();
   }
+
+  // Listen for messages from the background script (e.g., MCP results)
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'MCP_BROWSE_RESULT' && request.payload) {
+      const { title, url, snippet } = request.payload;
+      let resultText = `Navigated to: "${title}" (${url}).`;
+      if (snippet) {
+        resultText += `\nPreview: ${snippet}`;
+      }
+      const browseResultMessage = createMessage(resultText, 'system');
+      addMessageToChat(browseResultMessage);
+      
+      // Update session with this system message if a session is active
+      if (currentSession) {
+        currentSession.messages.push(browseResultMessage);
+        currentSession.updatedAt = Date.now();
+        saveToStorage(`session_${currentSession.id}`, currentSession).catch(err => {
+          console.error('Failed to save session after MCP_BROWSE_RESULT:', err);
+        });
+      } else {
+        // If there's no current session, we might want to log this or handle it.
+        // For now, the message is displayed in the chat, but not saved to a session.
+        console.warn('MCP_BROWSE_RESULT received, but no currentSession to save it to.');
+      }
+      // It's good practice to send a response, though not strictly necessary here unless background expects it.
+      sendResponse({received: true}); 
+    }
+    // Return true to indicate you wish to send a response asynchronously (if needed in other handlers)
+    return true; 
+  });
 });
 
 // Handle send message button click

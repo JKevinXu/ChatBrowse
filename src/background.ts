@@ -215,14 +215,57 @@ async function handleUserMessage(
     mcpClient.browseWebpage(url)
       .then(response => {
         console.log('BACKGROUND (handleUserMessage): mcpClient.browseWebpage response:', response);
-        // Optionally, send another message to UI upon completion/failure if needed,
-        // for now, mcpClient logs errors, and success might be implicit by page change.
-        // Example: chrome.runtime.sendMessage({ command: 'UPDATE_POPUP_UI', data: { answer: response.success ? `Successfully navigated to ${url}` : `Failed to navigate: ${response.error}` } });
+
+        if (response && response.success) {
+          // response.title, response.url, response.content are directly available
+          // content might be an object like {title, text, url} or just text, 
+          // mcp-client already tries to normalize title and url to top level of BrowseResponse
+          const title = response.title || 'Untitled Page';
+          const responseUrl = response.url || url;
+          let textContent = '';
+
+          if (typeof response.content === 'string') {
+            textContent = response.content;
+          } else if (response.content && typeof response.content.text === 'string') {
+            textContent = response.content.text;
+          } else {
+            textContent = 'No content preview available.';
+          }
+
+          const maxLength = 200; // Max length for content snippet
+          const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
+
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: title,
+              url: responseUrl,
+              snippet: snippet
+            }
+          });
+        } else if (response && !response.success) {
+          // Handle cases where browse was called but failed internally in MCP (error reported by mcp-client)
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: 'Navigation Failed',
+              url: url,
+              snippet: response.error || 'An unknown error occurred during navigation.'
+            }
+          });
+        }
+        // If response is undefined or null, the catch block below will handle it as a general error.
       })
       .catch(error => {
         console.error('BACKGROUND (handleUserMessage): mcpClient.browseWebpage error:', error);
-        // Optionally, send error to UI
-        // Example: chrome.runtime.sendMessage({ command: 'UPDATE_POPUP_UI', data: { answer: `Error navigating: ${error.message}` } });
+        chrome.runtime.sendMessage({
+          type: 'MCP_BROWSE_RESULT',
+          payload: {
+            title: 'Navigation Error',
+            url: url,
+            snippet: error.message || 'Failed to initiate navigation.'
+          }
+        });
       });
     return; // Still return, as sendResponse was called for initial feedback.
   }
