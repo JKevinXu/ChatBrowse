@@ -10,9 +10,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showNotificationsCheckbox = document.getElementById('showNotifications') as HTMLInputElement | null;
   const saveButton = document.getElementById('saveButton') as HTMLButtonElement | null;
   const messageDiv = document.getElementById('message') as HTMLDivElement | null;
+  const toggleApiKeyVisibilityButton = document.getElementById('toggleApiKeyVisibility') as HTMLButtonElement | null;
 
   // Check if elements exist
-  if (!apiKeyInput || !showNotificationsCheckbox || !saveButton || !messageDiv) {
+  if (!apiKeyInput || !showNotificationsCheckbox || !saveButton || !messageDiv || !toggleApiKeyVisibilityButton) {
     console.error('One or more required elements not found in the DOM');
     return;
   }
@@ -32,6 +33,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     showNotificationsCheckbox.checked = true;
     showMessage('Error loading settings: ' + (error as Error).message, 'error');
   }
+
+  // Toggle API key visibility
+  toggleApiKeyVisibilityButton.addEventListener('click', () => {
+    if (apiKeyInput.type === 'password') {
+      apiKeyInput.type = 'text';
+      toggleApiKeyVisibilityButton.textContent = 'Hide';
+    } else {
+      apiKeyInput.type = 'password';
+      toggleApiKeyVisibilityButton.textContent = 'Show';
+    }
+  });
 
   // Save settings when the button is clicked
   saveButton.addEventListener('click', async () => {

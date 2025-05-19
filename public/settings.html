@@ -57,7 +57,10 @@
   
   <div class="form-group">
     <label for="apiKey">OpenAI API Key</label>
-    <input type="text" id="apiKey" placeholder="Enter your OpenAI API key">
+    <div style="display: flex; align-items: center;">
+      <input type="password" id="apiKey" placeholder="Enter your OpenAI API key" style="flex-grow: 1; margin-right: 5px;">
+      <button id="toggleApiKeyVisibility" type="button" style="padding: 8px 12px; font-size: 0.9em;">Show</button>
+    </div>
     <small>Your API key is stored locally and never sent to our servers.</small>
   </div>
   
