@@ -28,7 +28,7 @@ interface ToolResponse {
 async function ensureBrowser(): Promise<Page> {
   if (!browser) {
     try {
-      browser = await chromium.launch({ headless: true });
+      browser = await chromium.launch({ headless: false });
       page = await browser.newPage();
     } catch (error) {
       console.error('Failed to initialize browser:', error);
