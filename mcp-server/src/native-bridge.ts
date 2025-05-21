@@ -181,6 +181,23 @@ function handleMessage(message: any): void {
           }
         }
       };
+    } else if (toolName === 'bilibili_search') {
+      if (!parameters.query) {
+        sendMessageToChrome({
+          success: false,
+          error: 'NATIVE_BRIDGE_LOG: bilibili_search tool call missing query parameter.'
+        });
+        return;
+      }
+      mcpMessage = {
+        method: 'tool',
+        params: {
+          name: 'bilibili_search',
+          parameters: {
+            query: parameters.query
+          }
+        }
+      };
     } else {
       sendMessageToChrome({ 
         success: false, 

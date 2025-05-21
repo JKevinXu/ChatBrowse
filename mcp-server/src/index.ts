@@ -20,6 +20,11 @@ interface GoogleSearchParams {
   query: string;
 }
 
+// Interface for bilibili_search parameters
+interface BilibiliSearchParams {
+  query: string;
+}
+
 // Response structure
 interface ToolResponse {
   success: boolean;
@@ -58,6 +63,8 @@ async function handleRequest(request: any): Promise<any> {
       return handleBrowseWebpage(parameters);
     } else if (name === 'google_search') {
       return handleGoogleSearch(parameters);
+    } else if (name === 'bilibili_search') {
+      return handleBilibiliSearch(parameters);
     } else {
       return {
         success: false,
@@ -158,6 +165,58 @@ async function handleGoogleSearch(params: GoogleSearchParams): Promise<ToolRespo
     return {
       success: false,
       error: `Failed to perform Google search: ${errorMessage}`
+    };
+  }
+}
+
+// New Tool: Bilibili Search
+async function handleBilibiliSearch(params: BilibiliSearchParams): Promise<ToolResponse> {
+  try {
+    const page = await ensureBrowser();
+    const query = params.query;
+
+    if (!query) {
+      return {
+        success: false,
+        error: 'Bilibili search query is missing.'
+      };
+    }
+
+    // Navigate to Bilibili
+    await page.goto('https://www.bilibili.com/', { waitUntil: 'domcontentloaded' });
+
+    // Type the search query
+    const searchInputSelector = 'input.nav-search-input';
+    await page.waitForSelector(searchInputSelector, { state: 'visible' });
+    await page.fill(searchInputSelector, query);
+
+    // Submit the search (by pressing Enter in the input field)
+    await page.press(searchInputSelector, 'Enter');
+
+    // Wait for search results to load
+    await page.waitForLoadState('domcontentloaded');
+    // Consider waiting for a specific results container element for more robustness
+
+    // Extract content
+    const content = await page.evaluate(() => {
+      return {
+        title: document.title,
+        text: document.body.innerText.slice(0, 5000), // Snippet of results page
+        url: window.location.href
+      };
+    });
+
+    return {
+      success: true,
+      content,
+      url: page.url(),
+      title: await page.title()
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: `Failed to perform Bilibili search: ${errorMessage}`
     };
   }
 }

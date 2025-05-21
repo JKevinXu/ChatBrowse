@@ -197,6 +197,10 @@ async function handleUserMessage(
   const googleSearchRegex = /^(?:google\s+(?:search\s+for\s+|search\s+|find\s+)?|search\s+(?:google\s+for\s+|google\s+|for\s+)?)(.+)$/i;
   const googleSearchMatch = lowerText.match(googleSearchRegex);
 
+  // Regex for Bilibili search commands
+  const bilibiliSearchRegex = /^(?:bilibili\s+(?:search\s+for\s+|search\s+|find\s+)?|search\s+(?:bilibili\s+for\s+|bilibili\s+|for\s+)?on\s+bilibili\s+)?(.+)$/i;
+  const bilibiliSearchMatch = lowerText.match(bilibiliSearchRegex);
+
   if (lowerText.startsWith('go to ') || lowerText.startsWith('navigate to ')) {
     let url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
     // Basic URL validation and normalization
@@ -340,6 +344,69 @@ async function handleUserMessage(
         });
       });
     return; // Return after handling the search command
+  }
+  
+  // Handle Bilibili Search command
+  if (bilibiliSearchMatch && bilibiliSearchMatch[1]) {
+    const searchQuery = bilibiliSearchMatch[1].trim();
+    console.log(`BACKGROUND (handleUserMessage): Detected Bilibili search command for query: "${searchQuery}"`);
+
+    sendResponse({
+      type: 'MESSAGE',
+      payload: {
+        text: `Searching Bilibili for "${searchQuery}"...`,
+        sessionId
+      }
+    });
+
+    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.bilibiliSearch with query: "${searchQuery}"`);
+    mcpClient.bilibiliSearch(searchQuery)
+      .then(response => {
+        console.log('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch response:', response);
+        if (response && response.success) {
+          const title = response.title || 'Bilibili Search Results';
+          const responseUrl = response.url || 'https://www.bilibili.com/';
+          let textContent = '';
+          if (typeof response.content === 'string') {
+            textContent = response.content;
+          } else if (response.content && typeof response.content.text === 'string') {
+            textContent = response.content.text;
+          } else {
+            textContent = 'No content preview available for Bilibili search results.';
+          }
+          const maxLength = 200;
+          const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: title,
+              url: responseUrl,
+              snippet: snippet
+            }
+          });
+        } else if (response && !response.success) {
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: 'Bilibili Search Failed',
+              url: 'https://www.bilibili.com/',
+              snippet: response.error || 'An unknown error occurred during Bilibili search.'
+            }
+          });
+        }
+      })
+      .catch(error => {
+        console.error('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch error:', error);
+        chrome.runtime.sendMessage({
+          type: 'MCP_BROWSE_RESULT',
+          payload: {
+            title: 'Bilibili Search Error',
+            url: 'https://www.bilibili.com/',
+            snippet: error.message || 'Failed to initiate Bilibili search.'
+          }
+        });
+      });
+    return; // Return after handling the Bilibili search command
   }
   
   // Handle help command directly
