@@ -141,40 +141,65 @@ function handleMessage(message: any): void {
     return;
   }
 
-  // Check for the structure sent by mcp-client.ts
-  if (message.method === 'tool' && message.params && message.params.name === 'browse_webpage') {
+  if (message.method === 'tool' && message.params && message.params.name) {
+    const toolName = message.params.name;
     const parameters = message.params.parameters || {};
-    const url = parameters.url;
-    const selector = parameters.selector;
+    let mcpMessage: any = null;
 
-    if (!url) {
-      sendMessageToChrome({
-        success: false,
-        error: 'NATIVE_BRIDGE_LOG: browse_webpage tool call missing URL parameter.'
-      });
-      return;
-    }
-
-    // Format for the browse_webpage MCP call (this part is actually correct for index.js)
-    const mcpMessage = {
-      method: 'tool',
-      params: {
-        name: 'browse_webpage',
-        parameters: {
-          url: url,
-          selector: selector
-        }
+    if (toolName === 'browse_webpage') {
+      if (!parameters.url) {
+        sendMessageToChrome({
+          success: false,
+          error: 'NATIVE_BRIDGE_LOG: browse_webpage tool call missing URL parameter.'
+        });
+        return;
       }
-    };
+      mcpMessage = {
+        method: 'tool',
+        params: {
+          name: 'browse_webpage',
+          parameters: {
+            url: parameters.url,
+            selector: parameters.selector
+          }
+        }
+      };
+    } else if (toolName === 'google_search') {
+      if (!parameters.query) {
+        sendMessageToChrome({
+          success: false,
+          error: 'NATIVE_BRIDGE_LOG: google_search tool call missing query parameter.'
+        });
+        return;
+      }
+      mcpMessage = {
+        method: 'tool',
+        params: {
+          name: 'google_search',
+          parameters: {
+            query: parameters.query
+          }
+        }
+      };
+    } else {
+      sendMessageToChrome({ 
+        success: false, 
+        error: `NATIVE_BRIDGE_LOG: Unknown tool name received: ${toolName}` 
+      });
+      return; // Important to return if tool name is unknown
+    }
     
-    try {
-      const mcpMessageString = JSON.stringify(mcpMessage) + '\n'; 
-      console.error(`NATIVE_BRIDGE_LOG: Writing to MCP server stdin: ${mcpMessageString.trim()}`); 
-      mcpServerInstance.stdin.write(mcpMessageString);
-      console.error('NATIVE_BRIDGE_LOG: Successfully wrote to MCP server stdin.'); 
-    } catch (e:any) {
-      console.error(`NATIVE_BRIDGE_LOG: Error writing to mcpServerInstance.stdin: ${e.message}`);
-      sendMessageToChrome({ success: false, error: `NATIVE_BRIDGE_LOG: Error writing to MCP server: ${e.message}` });
+    // If mcpMessage was constructed, send it
+    if (mcpMessage) {
+      try {
+        const mcpMessageString = JSON.stringify(mcpMessage) + '\n'; 
+        console.error(`NATIVE_BRIDGE_LOG: Writing to MCP server stdin: ${mcpMessageString.trim()}`); 
+        mcpServerInstance.stdin.write(mcpMessageString);
+        console.error('NATIVE_BRIDGE_LOG: Successfully wrote to MCP server stdin.'); 
+      } catch (e:any) {
+        console.error(`NATIVE_BRIDGE_LOG: Error writing to mcpServerInstance.stdin: ${e.message}`);
+        sendMessageToChrome({ success: false, error: `NATIVE_BRIDGE_LOG: Error writing to MCP server: ${e.message}` });
+      }
     }
   } else {
     let receivedType = message.type !== undefined ? message.type : (message.method !== undefined ? message.method : 'unknown_structure');

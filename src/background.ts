@@ -193,6 +193,10 @@ async function handleUserMessage(
 ) {
   const lowerText = text.toLowerCase().trim();
   
+  // Regex for Google search commands
+  const googleSearchRegex = /^(?:google\s+(?:search\s+for\s+|search\s+|find\s+)?|search\s+(?:google\s+for\s+|google\s+|for\s+)?)(.+)$/i;
+  const googleSearchMatch = lowerText.match(googleSearchRegex);
+
   if (lowerText.startsWith('go to ') || lowerText.startsWith('navigate to ')) {
     let url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
     // Basic URL validation and normalization
@@ -268,6 +272,74 @@ async function handleUserMessage(
         });
       });
     return; // Still return, as sendResponse was called for initial feedback.
+  }
+  
+  // Handle Google Search command
+  if (googleSearchMatch && googleSearchMatch[1]) {
+    const searchQuery = googleSearchMatch[1].trim();
+    console.log(`BACKGROUND (handleUserMessage): Detected Google search command for query: "${searchQuery}"`);
+
+    // Send immediate feedback to UI
+    sendResponse({
+      type: 'MESSAGE',
+      payload: {
+        text: `Searching Google for "${searchQuery}"...`,
+        sessionId
+      }
+    });
+
+    // Call MCP client to perform Google search
+    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.googleSearch with query: "${searchQuery}"`);
+    mcpClient.googleSearch(searchQuery)
+      .then(response => {
+        console.log('BACKGROUND (handleUserMessage): mcpClient.googleSearch response:', response);
+        if (response && response.success) {
+          const title = response.title || 'Google Search Results';
+          const responseUrl = response.url || 'https://www.google.com/';
+          let textContent = '';
+
+          if (typeof response.content === 'string') {
+            textContent = response.content;
+          } else if (response.content && typeof response.content.text === 'string') {
+            textContent = response.content.text;
+          } else {
+            textContent = 'No content preview available for search results.';
+          }
+
+          const maxLength = 200;
+          const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
+
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT', // Reusing the same message type for simplicity
+            payload: {
+              title: title,
+              url: responseUrl,
+              snippet: snippet
+            }
+          });
+        } else if (response && !response.success) {
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: 'Google Search Failed',
+              url: 'https://www.google.com/',
+              snippet: response.error || 'An unknown error occurred during Google search.'
+            }
+          });
+        }
+      })
+      .catch(error => {
+        console.error('BACKGROUND (handleUserMessage): mcpClient.googleSearch error:', error);
+        chrome.runtime.sendMessage({
+          type: 'MCP_BROWSE_RESULT',
+          payload: {
+            title: 'Google Search Error',
+            url: 'https://www.google.com/',
+            snippet: error.message || 'Failed to initiate Google search.'
+          }
+        });
+      });
+    return; // Return after handling the search command
   }
   
   // Handle help command directly

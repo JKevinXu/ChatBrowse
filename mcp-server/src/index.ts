@@ -15,6 +15,11 @@ interface BrowseParams {
   selector?: string;
 }
 
+// Interface for google_search parameters
+interface GoogleSearchParams {
+  query: string;
+}
+
 // Response structure
 interface ToolResponse {
   success: boolean;
@@ -51,6 +56,8 @@ async function handleRequest(request: any): Promise<any> {
     
     if (name === 'browse_webpage') {
       return handleBrowseWebpage(parameters);
+    } else if (name === 'google_search') {
+      return handleGoogleSearch(parameters);
     } else {
       return {
         success: false,
@@ -98,6 +105,59 @@ async function handleBrowseWebpage(params: BrowseParams): Promise<ToolResponse> 
     return {
       success: false,
       error: `Failed to browse webpage: ${errorMessage}`
+    };
+  }
+}
+
+// New Tool: Google Search
+async function handleGoogleSearch(params: GoogleSearchParams): Promise<ToolResponse> {
+  try {
+    const page = await ensureBrowser();
+    const query = params.query;
+
+    if (!query) {
+      return {
+        success: false,
+        error: 'Google search query is missing.'
+      };
+    }
+
+    // Navigate to Google
+    await page.goto('https://www.google.com', { waitUntil: 'domcontentloaded' });
+
+    // Type the search query
+    const searchInputSelector = 'textarea[name="q"]';
+    await page.waitForSelector(searchInputSelector, { state: 'visible' });
+    await page.fill(searchInputSelector, query);
+
+    // Submit the search (by pressing Enter)
+    await page.press(searchInputSelector, 'Enter');
+
+    // Wait for search results to load
+    await page.waitForLoadState('domcontentloaded');
+    // It might be beneficial to wait for a specific element that indicates results are loaded,
+    // e.g., await page.waitForSelector('#search'); or similar, for robustness.
+
+    // Extract content (similar to browseWebpage)
+    const content = await page.evaluate(() => {
+      return {
+        title: document.title,
+        text: document.body.innerText.slice(0, 5000), // Get a snippet of the results page
+        url: window.location.href
+      };
+    });
+
+    return {
+      success: true,
+      content,
+      url: page.url(),
+      title: await page.title()
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: `Failed to perform Google search: ${errorMessage}`
     };
   }
 }
