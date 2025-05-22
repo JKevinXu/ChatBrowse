@@ -197,9 +197,13 @@ async function handleUserMessage(
   const googleSearchRegex = /^(?:google\s+(?:search\s+for\s+|search\s+|find\s+)?|search\s+(?:google\s+for\s+|google\s+|for\s+)?)(.+)$/i;
   const googleSearchMatch = lowerText.match(googleSearchRegex);
 
-  // Regex for Bilibili search commands
-  const bilibiliSearchRegex = /^(?:bilibili\s+(?:search\s+for\s+|search\s+|find\s+)?|search\s+(?:bilibili\s+for\s+|bilibili\s+|for\s+)?on\s+bilibili\s+)?(.+)$/i;
+  // Regex for Bilibili search commands - requires "bilibili" to be present
+  const bilibiliSearchRegex = /^(?:search\s+(?:for\s+)?(.+?)\s+on\s+bilibili|bilibili\s+(?:search\s+for\s+|search\s+|find\s+)?(.+))$/i;
   const bilibiliSearchMatch = lowerText.match(bilibiliSearchRegex);
+
+  // Regex for Xiaohongshu search commands - requires "xiaohongshu" to be present
+  const xiaohongshuSearchRegex = /^(?:search\s+(?:for\s+)?(.+?)\s+on\s+xiaohongshu|xiaohongshu\s+(?:search\s+for\s+|search\s+|find\s+)?(.+))$/i;
+  const xiaohongshuSearchMatch = lowerText.match(xiaohongshuSearchRegex);
 
   if (lowerText.startsWith('go to ') || lowerText.startsWith('navigate to ')) {
     let url = lowerText.replace(/^(go to|navigate to)\s+/i, '').trim();
@@ -347,66 +351,121 @@ async function handleUserMessage(
   }
   
   // Handle Bilibili Search command
-  if (bilibiliSearchMatch && bilibiliSearchMatch[1]) {
-    const searchQuery = bilibiliSearchMatch[1].trim();
-    console.log(`BACKGROUND (handleUserMessage): Detected Bilibili search command for query: "${searchQuery}"`);
-
-    sendResponse({
-      type: 'MESSAGE',
-      payload: {
-        text: `Searching Bilibili for "${searchQuery}"...`,
-        sessionId
-      }
-    });
-
-    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.bilibiliSearch with query: "${searchQuery}"`);
-    mcpClient.bilibiliSearch(searchQuery)
-      .then(response => {
-        console.log('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch response:', response);
-        if (response && response.success) {
-          const title = response.title || 'Bilibili Search Results';
-          const responseUrl = response.url || 'https://www.bilibili.com/';
-          let textContent = '';
-          if (typeof response.content === 'string') {
-            textContent = response.content;
-          } else if (response.content && typeof response.content.text === 'string') {
-            textContent = response.content.text;
-          } else {
-            textContent = 'No content preview available for Bilibili search results.';
-          }
-          const maxLength = 200;
-          const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
-          chrome.runtime.sendMessage({
-            type: 'MCP_BROWSE_RESULT',
-            payload: {
-              title: title,
-              url: responseUrl,
-              snippet: snippet
-            }
-          });
-        } else if (response && !response.success) {
-          chrome.runtime.sendMessage({
-            type: 'MCP_BROWSE_RESULT',
-            payload: {
-              title: 'Bilibili Search Failed',
-              url: 'https://www.bilibili.com/',
-              snippet: response.error || 'An unknown error occurred during Bilibili search.'
-            }
-          });
-        }
-      })
-      .catch(error => {
-        console.error('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch error:', error);
-        chrome.runtime.sendMessage({
-          type: 'MCP_BROWSE_RESULT',
-          payload: {
-            title: 'Bilibili Search Error',
-            url: 'https://www.bilibili.com/',
-            snippet: error.message || 'Failed to initiate Bilibili search.'
-          }
-        });
+  if (bilibiliSearchMatch) {
+    const searchQuery = (bilibiliSearchMatch[1] || bilibiliSearchMatch[2] || '').trim();
+    if (searchQuery) {
+      console.log(`BACKGROUND (handleUserMessage): Detected Bilibili search command for query: "${searchQuery}"`);
+      sendResponse({
+        type: 'MESSAGE',
+        payload: { text: `Searching Bilibili for "${searchQuery}"...`, sessionId }
       });
-    return; // Return after handling the Bilibili search command
+      mcpClient.bilibiliSearch(searchQuery)
+        .then(response => {
+          console.log('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch response:', response);
+          if (response && response.success) {
+            const title = response.title || 'Bilibili Search Results';
+            const responseUrl = response.url || 'https://www.bilibili.com/';
+            let textContent = '';
+            if (typeof response.content === 'string') {
+              textContent = response.content;
+            } else if (response.content && typeof response.content.text === 'string') {
+              textContent = response.content.text;
+            } else {
+              textContent = 'No content preview available for Bilibili search results.';
+            }
+            const maxLength = 200;
+            const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
+            chrome.runtime.sendMessage({
+              type: 'MCP_BROWSE_RESULT',
+              payload: {
+                title: title,
+                url: responseUrl,
+                snippet: snippet
+              }
+            });
+          } else if (response && !response.success) {
+            chrome.runtime.sendMessage({
+              type: 'MCP_BROWSE_RESULT',
+              payload: {
+                title: 'Bilibili Search Failed',
+                url: 'https://www.bilibili.com/',
+                snippet: response.error || 'An unknown error occurred during Bilibili search.'
+              }
+            });
+          }
+        })
+        .catch(error => {
+          console.error('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch error:', error);
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: 'Bilibili Search Error',
+              url: 'https://www.bilibili.com/',
+              snippet: error.message || 'Failed to initiate Bilibili search.'
+            }
+          });
+        });
+      return;
+    }
+  }
+  
+  // Handle Xiaohongshu Search command
+  if (xiaohongshuSearchMatch) {
+    const searchQuery = (xiaohongshuSearchMatch[1] || xiaohongshuSearchMatch[2] || '').trim();
+    if (searchQuery) {
+      console.log(`BACKGROUND (handleUserMessage): Detected Xiaohongshu search command for query: "${searchQuery}"`);
+      sendResponse({
+        type: 'MESSAGE',
+        payload: { text: `Searching Xiaohongshu for "${searchQuery}"...`, sessionId }
+      });
+      mcpClient.xiaohongshuSearch(searchQuery)
+        .then(response => {
+          console.log('BACKGROUND (handleUserMessage): mcpClient.xiaohongshuSearch response:', response);
+          if (response && response.success) {
+            const title = response.title || 'Xiaohongshu Search Results';
+            const responseUrl = response.url || 'https://www.xiaohongshu.com/explore';
+            let textContent = '';
+            if (typeof response.content === 'string') {
+              textContent = response.content;
+            } else if (response.content && typeof response.content.text === 'string') {
+              textContent = response.content.text;
+            } else {
+              textContent = 'No content preview available for Xiaohongshu search results.';
+            }
+            const maxLength = 200;
+            const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
+            chrome.runtime.sendMessage({
+              type: 'MCP_BROWSE_RESULT',
+              payload: {
+                title: title,
+                url: responseUrl,
+                snippet: snippet
+              }
+            });
+          } else if (response && !response.success) {
+            chrome.runtime.sendMessage({
+              type: 'MCP_BROWSE_RESULT',
+              payload: {
+                title: 'Xiaohongshu Search Failed',
+                url: 'https://www.xiaohongshu.com/explore',
+                snippet: response.error || 'An unknown error occurred during Xiaohongshu search.'
+              }
+            });
+          }
+        })
+        .catch(error => {
+          console.error('BACKGROUND (handleUserMessage): mcpClient.xiaohongshuSearch error:', error);
+          chrome.runtime.sendMessage({
+            type: 'MCP_BROWSE_RESULT',
+            payload: {
+              title: 'Xiaohongshu Search Error',
+              url: 'https://www.xiaohongshu.com/explore',
+              snippet: error.message || 'Failed to initiate Xiaohongshu search.'
+            }
+          });
+        });
+      return;
+    }
   }
   
   // Handle help command directly

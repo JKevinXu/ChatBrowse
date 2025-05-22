@@ -283,6 +283,73 @@ class McpClient {
     });
   }
   
+  public async xiaohongshuSearch(query: string): Promise<BrowseResponse> {
+    return new Promise((resolve, reject) => {
+      if (!this.connected || !this.port) {
+        reject(new Error('Not connected to MCP server'));
+        return;
+      }
+
+      const responseHandler = (response: NativeHostMessage) => {
+        this.port?.onMessage.removeListener(responseHandler);
+        console.log('MCP CLIENT: Received response for xiaohongshuSearch:', response);
+
+        if (!response.success) {
+          resolve({
+            success: false,
+            error: response.error || 'Unknown error from MCP server during xiaohongshuSearch'
+          });
+        } else {
+          if (typeof response.data === 'string') {
+            try {
+              const parsedData = JSON.parse(response.data);
+              if (parsedData.success) {
+                resolve({
+                  success: true,
+                  content: parsedData.content,
+                  title: parsedData.title,
+                  url: parsedData.url
+                });
+              } else {
+                resolve({
+                  success: false,
+                  error: parsedData.error || 'MCP Server returned success:false in data payload for xiaohongshuSearch'
+                });
+              }
+            } catch (e: any) {
+              resolve({
+                success: false,
+                error: `MCP_CLIENT_ERROR: Failed to parse JSON response data for xiaohongshuSearch: ${e.message}`
+              });
+            }
+          } else {
+            resolve({
+              success: false,
+              error: 'MCP_CLIENT_ERROR: Unexpected response.data format for xiaohongshuSearch (expected stringified JSON).'
+            });
+          }
+        }
+      };
+
+      this.port.onMessage.addListener(responseHandler);
+
+      try {
+        this.port.postMessage({
+          method: 'tool',
+          params: {
+            name: 'xiaohongshu_search',
+            parameters: {
+              query
+            }
+          }
+        });
+      } catch (error) {
+        this.port?.onMessage.removeListener(responseHandler);
+        reject(error);
+      }
+    });
+  }
+  
   /**
    * Check if the MCP server is installed and available
    */

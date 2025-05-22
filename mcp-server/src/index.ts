@@ -25,6 +25,11 @@ interface BilibiliSearchParams {
   query: string;
 }
 
+// Interface for xiaohongshu_search parameters
+interface XiaohongshuSearchParams {
+  query: string;
+}
+
 // Response structure
 interface ToolResponse {
   success: boolean;
@@ -65,6 +70,8 @@ async function handleRequest(request: any): Promise<any> {
       return handleGoogleSearch(parameters);
     } else if (name === 'bilibili_search') {
       return handleBilibiliSearch(parameters);
+    } else if (name === 'xiaohongshu_search') {
+      return handleXiaohongshuSearch(parameters);
     } else {
       return {
         success: false,
@@ -217,6 +224,61 @@ async function handleBilibiliSearch(params: BilibiliSearchParams): Promise<ToolR
     return {
       success: false,
       error: `Failed to perform Bilibili search: ${errorMessage}`
+    };
+  }
+}
+
+// New Tool: Xiaohongshu Search
+async function handleXiaohongshuSearch(params: XiaohongshuSearchParams): Promise<ToolResponse> {
+  try {
+    const page = await ensureBrowser();
+    const query = params.query;
+
+    if (!query) {
+      return {
+        success: false,
+        error: 'Xiaohongshu search query is missing.'
+      };
+    }
+
+    // Navigate to Xiaohongshu explore page
+    await page.goto('https://www.xiaohongshu.com/explore', { waitUntil: 'domcontentloaded' });
+
+    // Type the search query
+    const searchInputSelector = 'input#search-input'; // Using the ID
+    await page.waitForSelector(searchInputSelector, { state: 'visible' });
+    await page.fill(searchInputSelector, query);
+
+    // Submit the search (by pressing Enter in the input field)
+    await page.press(searchInputSelector, 'Enter');
+
+    // Wait for search results to load
+    await page.waitForLoadState('domcontentloaded');
+    // Consider waiting for a specific results container element for more robustness
+    // For Xiaohongshu, the page might transition, or content might load dynamically.
+    // A more robust wait would be for a selector that appears only on the results page.
+    // e.g., await page.waitForSelector('.note-item', { timeout: 10000 }); // Example selector for a result item
+
+    // Extract content
+    const content = await page.evaluate(() => {
+      return {
+        title: document.title,
+        text: document.body.innerText.slice(0, 5000), // Snippet of results page
+        url: window.location.href
+      };
+    });
+
+    return {
+      success: true,
+      content,
+      url: page.url(),
+      title: await page.title()
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: `Failed to perform Xiaohongshu search: ${errorMessage}`
     };
   }
 }

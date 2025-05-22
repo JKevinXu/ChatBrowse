@@ -198,6 +198,23 @@ function handleMessage(message: any): void {
           }
         }
       };
+    } else if (toolName === 'xiaohongshu_search') {
+      if (!parameters.query) {
+        sendMessageToChrome({
+          success: false,
+          error: 'NATIVE_BRIDGE_LOG: xiaohongshu_search tool call missing query parameter.'
+        });
+        return;
+      }
+      mcpMessage = {
+        method: 'tool',
+        params: {
+          name: 'xiaohongshu_search',
+          parameters: {
+            query: parameters.query
+          }
+        }
+      };
     } else {
       sendMessageToChrome({ 
         success: false, 
