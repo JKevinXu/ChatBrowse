@@ -16,6 +16,7 @@ interface Chrome {
     };
     openOptionsPage?: () => void;
     getURL: (path: string) => string;
+    connectNative: (application: string) => chrome.runtime.Port;
   };
   
   storage: {
@@ -58,6 +59,21 @@ declare namespace chrome {
     onInstalled: {
       addListener: (callback: (details: { reason: string; previousVersion?: string; temporary?: boolean }) => void) => void;
     };
+    connectNative: (application: string) => Port;
+  }
+
+  export interface Port {
+    name: string;
+    onDisconnect: {
+      addListener: (callback: () => void) => void;
+      removeListener: (callback: () => void) => void;
+    };
+    onMessage: {
+      addListener: (callback: (message: any) => void) => void;
+      removeListener: (callback: (message: any) => void) => void;
+    };
+    postMessage: (message: any) => void;
+    disconnect: () => void;
   }
 
   export interface MessageSender {

@@ -149,7 +149,14 @@ class McpClient {
     });
   }
   
-  public async googleSearch(query: string): Promise<BrowseResponse> {
+  /**
+   * Generic search method to eliminate code duplication
+   * @param toolName The name of the search tool (e.g., 'google_search', 'bilibili_search')
+   * @param query The search query
+   * @param operationName Human-readable operation name for error messages (e.g., 'googleSearch')
+   * @returns Promise<BrowseResponse>
+   */
+  private async performSearch(toolName: string, query: string, operationName: string): Promise<BrowseResponse> {
     return new Promise((resolve, reject) => {
       if (!this.connected || !this.port) {
         reject(new Error('Not connected to MCP server'));
@@ -158,12 +165,12 @@ class McpClient {
 
       const responseHandler = (response: NativeHostMessage) => {
         this.port?.onMessage.removeListener(responseHandler);
-        console.log('MCP CLIENT: Received response for googleSearch:', response);
+        console.log(`MCP CLIENT: Received response for ${operationName}:`, response);
 
         if (!response.success) {
           resolve({
             success: false,
-            error: response.error || 'Unknown error from MCP server during googleSearch'
+            error: response.error || `Unknown error from MCP server during ${operationName}`
           });
         } else {
           if (typeof response.data === 'string') {
@@ -179,19 +186,19 @@ class McpClient {
               } else {
                 resolve({
                   success: false,
-                  error: parsedData.error || 'MCP Server returned success:false in data payload for googleSearch'
+                  error: parsedData.error || `MCP Server returned success:false in data payload for ${operationName}`
                 });
               }
             } catch (e: any) {
               resolve({
                 success: false,
-                error: `MCP_CLIENT_ERROR: Failed to parse JSON response data for googleSearch: ${e.message}`
+                error: `MCP_CLIENT_ERROR: Failed to parse JSON response data for ${operationName}: ${e.message}`
               });
             }
           } else {
             resolve({
               success: false,
-              error: 'MCP_CLIENT_ERROR: Unexpected response.data format for googleSearch (expected stringified JSON).'
+              error: `MCP_CLIENT_ERROR: Unexpected response.data format for ${operationName} (expected stringified JSON).`
             });
           }
         }
@@ -203,7 +210,7 @@ class McpClient {
         this.port.postMessage({
           method: 'tool',
           params: {
-            name: 'google_search',
+            name: toolName,
             parameters: {
               query
             }
@@ -214,140 +221,18 @@ class McpClient {
         reject(error);
       }
     });
+  }
+  
+  public async googleSearch(query: string): Promise<BrowseResponse> {
+    return this.performSearch('google_search', query, 'googleSearch');
   }
   
   public async bilibiliSearch(query: string): Promise<BrowseResponse> {
-    return new Promise((resolve, reject) => {
-      if (!this.connected || !this.port) {
-        reject(new Error('Not connected to MCP server'));
-        return;
-      }
-
-      const responseHandler = (response: NativeHostMessage) => {
-        this.port?.onMessage.removeListener(responseHandler);
-        console.log('MCP CLIENT: Received response for bilibiliSearch:', response);
-
-        if (!response.success) {
-          resolve({
-            success: false,
-            error: response.error || 'Unknown error from MCP server during bilibiliSearch'
-          });
-        } else {
-          if (typeof response.data === 'string') {
-            try {
-              const parsedData = JSON.parse(response.data);
-              if (parsedData.success) {
-                resolve({
-                  success: true,
-                  content: parsedData.content,
-                  title: parsedData.title,
-                  url: parsedData.url
-                });
-              } else {
-                resolve({
-                  success: false,
-                  error: parsedData.error || 'MCP Server returned success:false in data payload for bilibiliSearch'
-                });
-              }
-            } catch (e: any) {
-              resolve({
-                success: false,
-                error: `MCP_CLIENT_ERROR: Failed to parse JSON response data for bilibiliSearch: ${e.message}`
-              });
-            }
-          } else {
-            resolve({
-              success: false,
-              error: 'MCP_CLIENT_ERROR: Unexpected response.data format for bilibiliSearch (expected stringified JSON).'
-            });
-          }
-        }
-      };
-
-      this.port.onMessage.addListener(responseHandler);
-
-      try {
-        this.port.postMessage({
-          method: 'tool',
-          params: {
-            name: 'bilibili_search',
-            parameters: {
-              query
-            }
-          }
-        });
-      } catch (error) {
-        this.port?.onMessage.removeListener(responseHandler);
-        reject(error);
-      }
-    });
+    return this.performSearch('bilibili_search', query, 'bilibiliSearch');
   }
   
   public async xiaohongshuSearch(query: string): Promise<BrowseResponse> {
-    return new Promise((resolve, reject) => {
-      if (!this.connected || !this.port) {
-        reject(new Error('Not connected to MCP server'));
-        return;
-      }
-
-      const responseHandler = (response: NativeHostMessage) => {
-        this.port?.onMessage.removeListener(responseHandler);
-        console.log('MCP CLIENT: Received response for xiaohongshuSearch:', response);
-
-        if (!response.success) {
-          resolve({
-            success: false,
-            error: response.error || 'Unknown error from MCP server during xiaohongshuSearch'
-          });
-        } else {
-          if (typeof response.data === 'string') {
-            try {
-              const parsedData = JSON.parse(response.data);
-              if (parsedData.success) {
-                resolve({
-                  success: true,
-                  content: parsedData.content,
-                  title: parsedData.title,
-                  url: parsedData.url
-                });
-              } else {
-                resolve({
-                  success: false,
-                  error: parsedData.error || 'MCP Server returned success:false in data payload for xiaohongshuSearch'
-                });
-              }
-            } catch (e: any) {
-              resolve({
-                success: false,
-                error: `MCP_CLIENT_ERROR: Failed to parse JSON response data for xiaohongshuSearch: ${e.message}`
-              });
-            }
-          } else {
-            resolve({
-              success: false,
-              error: 'MCP_CLIENT_ERROR: Unexpected response.data format for xiaohongshuSearch (expected stringified JSON).'
-            });
-          }
-        }
-      };
-
-      this.port.onMessage.addListener(responseHandler);
-
-      try {
-        this.port.postMessage({
-          method: 'tool',
-          params: {
-            name: 'xiaohongshu_search',
-            parameters: {
-              query
-            }
-          }
-        });
-      } catch (error) {
-        this.port?.onMessage.removeListener(responseHandler);
-        reject(error);
-      }
-    });
+    return this.performSearch('xiaohongshu_search', query, 'xiaohongshuSearch');
   }
   
   /**
