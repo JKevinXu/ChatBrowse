@@ -43,6 +43,7 @@ interface Chrome {
     create: (createProperties: object, callback?: (tab: any) => void) => void;
     update: (tabId: number, updateProperties: { url?: string, active?: boolean }, callback?: (tab?: any) => void) => void;
     sendMessage: (tabId: number, message: any, callback?: (response: any) => void) => void;
+    get: (tabId: number, callback: (tab: any) => void) => void;
   };
 }
 
@@ -116,6 +117,7 @@ declare namespace chrome {
     create: (createProperties: object, callback?: (tab: any) => void) => void;
     update: (tabId: number, updateProperties: { url?: string, active?: boolean }, callback?: (tab?: any) => void) => void;
     sendMessage: (tabId: number, message: any, callback?: (response: any) => void) => void;
+    get: (tabId: number, callback: (tab: any) => void) => void;
   }
 
   export const runtime: Runtime;

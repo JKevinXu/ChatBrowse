@@ -222,27 +222,16 @@ async function handleUserMessage(
       }
     });
 
-    // Call MCP client to browse the webpage
-    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.browseWebpage with URL: ${url}`);
-    mcpClient.browseWebpage(url)
+    // USE CHROME EXTENSION NAVIGATION (current browser window)
+    const tabId = sender.tab?.id || payloadTabId;
+    navigateInCurrentBrowser(url, tabId)
       .then(response => {
-        console.log('BACKGROUND (handleUserMessage): mcpClient.browseWebpage response:', response);
+        console.log('BACKGROUND (handleUserMessage): navigateInCurrentBrowser response:', response);
 
         if (response && response.success) {
-          // response.title, response.url, response.content are directly available
-          // content might be an object like {title, text, url} or just text, 
-          // mcp-client already tries to normalize title and url to top level of BrowseResponse
           const title = response.title || 'Untitled Page';
           const responseUrl = response.url || url;
-          let textContent = '';
-
-          if (typeof response.content === 'string') {
-            textContent = response.content;
-          } else if (response.content && typeof response.content.text === 'string') {
-            textContent = response.content.text;
-          } else {
-            textContent = 'No content preview available.';
-          }
+          const textContent = response.content || 'No content preview available.';
 
           const maxLength = 200; // Max length for content snippet
           const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
@@ -255,8 +244,7 @@ async function handleUserMessage(
               snippet: snippet
             }
           });
-        } else if (response && !response.success) {
-          // Handle cases where browse was called but failed internally in MCP (error reported by mcp-client)
+        } else {
           chrome.runtime.sendMessage({
             type: 'MCP_BROWSE_RESULT',
             payload: {
@@ -266,10 +254,9 @@ async function handleUserMessage(
             }
           });
         }
-        // If response is undefined or null, the catch block below will handle it as a general error.
       })
       .catch(error => {
-        console.error('BACKGROUND (handleUserMessage): mcpClient.browseWebpage error:', error);
+        console.error('BACKGROUND (handleUserMessage): navigateInCurrentBrowser error:', error);
         chrome.runtime.sendMessage({
           type: 'MCP_BROWSE_RESULT',
           payload: {
@@ -296,36 +283,28 @@ async function handleUserMessage(
       }
     });
 
-    // Call MCP client to perform Google search
-    console.log(`BACKGROUND (handleUserMessage): Calling mcpClient.googleSearch with query: "${searchQuery}"`);
-    mcpClient.googleSearch(searchQuery)
+    // USE CHROME EXTENSION SEARCH (current browser window)
+    const tabId = sender.tab?.id || payloadTabId;
+    searchInCurrentBrowser(searchQuery, 'google', tabId)
       .then(response => {
-        console.log('BACKGROUND (handleUserMessage): mcpClient.googleSearch response:', response);
+        console.log('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Google) response:', response);
         if (response && response.success) {
           const title = response.title || 'Google Search Results';
           const responseUrl = response.url || 'https://www.google.com/';
-          let textContent = '';
-
-          if (typeof response.content === 'string') {
-            textContent = response.content;
-          } else if (response.content && typeof response.content.text === 'string') {
-            textContent = response.content.text;
-          } else {
-            textContent = 'No content preview available for search results.';
-          }
+          const textContent = response.content || 'No content preview available for search results.';
 
           const maxLength = 200;
           const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
 
           chrome.runtime.sendMessage({
-            type: 'MCP_BROWSE_RESULT', // Reusing the same message type for simplicity
+            type: 'MCP_BROWSE_RESULT',
             payload: {
               title: title,
               url: responseUrl,
               snippet: snippet
             }
           });
-        } else if (response && !response.success) {
+        } else {
           chrome.runtime.sendMessage({
             type: 'MCP_BROWSE_RESULT',
             payload: {
@@ -337,7 +316,7 @@ async function handleUserMessage(
         }
       })
       .catch(error => {
-        console.error('BACKGROUND (handleUserMessage): mcpClient.googleSearch error:', error);
+        console.error('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Google) error:', error);
         chrome.runtime.sendMessage({
           type: 'MCP_BROWSE_RESULT',
           payload: {
@@ -359,20 +338,16 @@ async function handleUserMessage(
         type: 'MESSAGE',
         payload: { text: `Searching Bilibili for "${searchQuery}"...`, sessionId }
       });
-      mcpClient.bilibiliSearch(searchQuery)
+
+      // USE CHROME EXTENSION SEARCH (current browser window)
+      const tabId = sender.tab?.id || payloadTabId;
+      searchInCurrentBrowser(searchQuery, 'bilibili', tabId)
         .then(response => {
-          console.log('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch response:', response);
+          console.log('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Bilibili) response:', response);
           if (response && response.success) {
             const title = response.title || 'Bilibili Search Results';
             const responseUrl = response.url || 'https://www.bilibili.com/';
-            let textContent = '';
-            if (typeof response.content === 'string') {
-              textContent = response.content;
-            } else if (response.content && typeof response.content.text === 'string') {
-              textContent = response.content.text;
-            } else {
-              textContent = 'No content preview available for Bilibili search results.';
-            }
+            const textContent = response.content || 'No content preview available for Bilibili search results.';
             const maxLength = 200;
             const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
             chrome.runtime.sendMessage({
@@ -383,7 +358,7 @@ async function handleUserMessage(
                 snippet: snippet
               }
             });
-          } else if (response && !response.success) {
+          } else {
             chrome.runtime.sendMessage({
               type: 'MCP_BROWSE_RESULT',
               payload: {
@@ -395,7 +370,7 @@ async function handleUserMessage(
           }
         })
         .catch(error => {
-          console.error('BACKGROUND (handleUserMessage): mcpClient.bilibiliSearch error:', error);
+          console.error('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Bilibili) error:', error);
           chrome.runtime.sendMessage({
             type: 'MCP_BROWSE_RESULT',
             payload: {
@@ -418,20 +393,16 @@ async function handleUserMessage(
         type: 'MESSAGE',
         payload: { text: `Searching Xiaohongshu for "${searchQuery}"...`, sessionId }
       });
-      mcpClient.xiaohongshuSearch(searchQuery)
+
+      // USE CHROME EXTENSION SEARCH (current browser window)
+      const tabId = sender.tab?.id || payloadTabId;
+      searchInCurrentBrowser(searchQuery, 'xiaohongshu', tabId)
         .then(response => {
-          console.log('BACKGROUND (handleUserMessage): mcpClient.xiaohongshuSearch response:', response);
+          console.log('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Xiaohongshu) response:', response);
           if (response && response.success) {
             const title = response.title || 'Xiaohongshu Search Results';
             const responseUrl = response.url || 'https://www.xiaohongshu.com/explore';
-            let textContent = '';
-            if (typeof response.content === 'string') {
-              textContent = response.content;
-            } else if (response.content && typeof response.content.text === 'string') {
-              textContent = response.content.text;
-            } else {
-              textContent = 'No content preview available for Xiaohongshu search results.';
-            }
+            const textContent = response.content || 'No content preview available for Xiaohongshu search results.';
             const maxLength = 200;
             const snippet = textContent.length > maxLength ? textContent.substring(0, maxLength) + "..." : textContent;
             chrome.runtime.sendMessage({
@@ -442,7 +413,7 @@ async function handleUserMessage(
                 snippet: snippet
               }
             });
-          } else if (response && !response.success) {
+          } else {
             chrome.runtime.sendMessage({
               type: 'MCP_BROWSE_RESULT',
               payload: {
@@ -454,7 +425,7 @@ async function handleUserMessage(
           }
         })
         .catch(error => {
-          console.error('BACKGROUND (handleUserMessage): mcpClient.xiaohongshuSearch error:', error);
+          console.error('BACKGROUND (handleUserMessage): searchInCurrentBrowser (Xiaohongshu) error:', error);
           chrome.runtime.sendMessage({
             type: 'MCP_BROWSE_RESULT',
             payload: {
@@ -819,4 +790,124 @@ function handleClearChat(
       payload: { text: 'Chat cleared', success: true }
     });
   });
+}
+
+// Chrome extension-based navigation (works in current browser)
+async function navigateInCurrentBrowser(url: string, tabId?: number): Promise<{ success: boolean; title?: string; url?: string; content?: string; error?: string }> {
+  return new Promise((resolve) => {
+    // Normalize URL
+    let targetUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      targetUrl = 'https://' + url;
+    }
+
+    // If no tabId provided, create a new tab or use current active tab
+    if (!tabId) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs.length > 0) {
+          performNavigation(targetUrl, tabs[0].id!, resolve);
+        } else {
+          // Create new tab
+          chrome.tabs.create({ url: targetUrl, active: true }, (tab) => {
+            if (tab && tab.id) {
+              performNavigation(targetUrl, tab.id, resolve);
+            } else {
+              resolve({ success: false, error: 'Failed to create new tab' });
+            }
+          });
+        }
+      });
+    } else {
+      performNavigation(targetUrl, tabId, resolve);
+    }
+  });
+}
+
+// Helper function to perform navigation and extract content
+function performNavigation(
+  url: string, 
+  tabId: number, 
+  resolve: (result: { success: boolean; title?: string; url?: string; content?: string; error?: string }) => void
+) {
+  chrome.tabs.update(tabId, { url }, (tab) => {
+    if (chrome.runtime.lastError) {
+      resolve({ success: false, error: chrome.runtime.lastError.message || 'Navigation failed' });
+      return;
+    }
+
+    // Wait for the page to load and then extract content
+    const checkTabLoaded = (attempts = 0) => {
+      if (attempts > 20) { // Max 10 seconds (20 * 500ms)
+        resolve({ success: false, error: 'Page load timeout' });
+        return;
+      }
+
+      chrome.tabs.get(tabId, (tab) => {
+        if (chrome.runtime.lastError || !tab) {
+          resolve({ success: false, error: 'Failed to get tab information' });
+          return;
+        }
+
+        if (tab.status === 'complete') {
+          // Page loaded, extract content
+          setTimeout(() => {
+            getPageInfo(tabId).then(pageInfo => {
+              if (pageInfo) {
+                resolve({
+                  success: true,
+                  title: pageInfo.title,
+                  url: pageInfo.url,
+                  content: pageInfo.content
+                });
+              } else {
+                resolve({
+                  success: true,
+                  title: tab.title || 'Unknown Title',
+                  url: tab.url || url,
+                  content: 'Content extraction not available'
+                });
+              }
+            }).catch(error => {
+              resolve({
+                success: true,
+                title: tab.title || 'Unknown Title',
+                url: tab.url || url,
+                content: `Content extraction failed: ${error.message}`
+              });
+            });
+          }, 1000); // Wait 1 second for content script to be ready
+        } else {
+          // Still loading, check again
+          setTimeout(() => checkTabLoaded(attempts + 1), 500);
+        }
+      });
+    };
+
+    checkTabLoaded();
+  });
+}
+
+// Chrome extension-based search (works in current browser)
+async function searchInCurrentBrowser(
+  query: string, 
+  searchEngine: 'google' | 'bilibili' | 'xiaohongshu' = 'google',
+  tabId?: number
+): Promise<{ success: boolean; title?: string; url?: string; content?: string; error?: string }> {
+  let searchUrl: string;
+  
+  switch (searchEngine) {
+    case 'google':
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      break;
+    case 'bilibili':
+      searchUrl = `https://search.bilibili.com/all?keyword=${encodeURIComponent(query)}`;
+      break;
+    case 'xiaohongshu':
+      searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(query)}`;
+      break;
+    default:
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  }
+
+  return navigateInCurrentBrowser(searchUrl, tabId);
 }
