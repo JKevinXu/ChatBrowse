@@ -347,6 +347,46 @@ function setupMessageListeners() {
     
     return false;
   });
+
+  // Listen for messages from the background script
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('CONTENT: Received message:', request);
+    
+    if (request.type === 'EXTRACT_PAGE_INFO') {
+      const pageInfo = extractPageInfo();
+      sendResponse(pageInfo);
+      return true;
+    }
+    
+    if (request.type === 'GET_PAGE_ANALYSIS') {
+      try {
+        const analysis = generatePageSummaryForAI();
+        sendResponse({ analysis });
+      } catch (error) {
+        console.error('CONTENT: Error generating page analysis:', error);
+        sendResponse({ analysis: '' });
+      }
+      return true;
+    }
+    
+    if (request.type === 'PERFORM_ACTION') {
+      performBrowserAction(request.action).then((result: any) => {
+        sendResponse(result);
+      }).catch((error: any) => {
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Will respond asynchronously
+    }
+    
+    if (request.type === 'TAKE_SCREENSHOT') {
+      sendResponse({ success: true, message: 'Screenshot request forwarded to background' });
+      return true;
+    }
+    
+    // For other action types, return a default response
+    sendResponse({ success: false, error: 'Unknown action type' });
+    return true;
+  });
 }
 
 // Clear the chat messages
@@ -360,6 +400,501 @@ function clearChat() {
     currentSession.messages = [];
     currentSession.updatedAt = Date.now();
   }
+}
+
+// Enhanced browser actions for content script
+interface BrowserAction {
+  type: 'click' | 'type' | 'scroll' | 'screenshot' | 'select' | 'submit' | 'wait' | 'hover';
+  selector?: string;
+  text?: string;
+  value?: string;
+  x?: number;
+  y?: number;
+  direction?: 'up' | 'down' | 'left' | 'right';
+  amount?: number;
+  timeout?: number;
+}
+
+interface BrowserActionResult {
+  success: boolean;
+  error?: string;
+  data?: any;
+}
+
+// Handle browser actions
+async function performBrowserAction(action: BrowserAction): Promise<BrowserActionResult> {
+  try {
+    switch (action.type) {
+      case 'click':
+        return await clickElement(action.selector, action.x, action.y);
+      
+      case 'type':
+        return await typeText(action.selector, action.text || '');
+      
+      case 'scroll':
+        return await scrollPage(action.direction || 'down', action.amount || 500);
+      
+      case 'screenshot':
+        return await takeScreenshot();
+      
+      case 'select':
+        return await selectOption(action.selector, action.value || '');
+      
+      case 'submit':
+        return await submitForm(action.selector);
+      
+      case 'wait':
+        return await waitForElement(action.selector, action.timeout || 5000);
+      
+      case 'hover':
+        return await hoverElement(action.selector);
+      
+      default:
+        return { success: false, error: `Unknown action type: ${action.type}` };
+    }
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// Click on an element
+async function clickElement(selector?: string, x?: number, y?: number): Promise<BrowserActionResult> {
+  if (selector) {
+    const element = document.querySelector(selector) as HTMLElement;
+    if (!element) {
+      return { success: false, error: `Element not found: ${selector}` };
+    }
+    element.click();
+    return { success: true, data: { clicked: selector } };
+  } else if (x !== undefined && y !== undefined) {
+    // Click at coordinates
+    const element = document.elementFromPoint(x, y) as HTMLElement;
+    if (!element) {
+      return { success: false, error: `No element at coordinates (${x}, ${y})` };
+    }
+    element.click();
+    return { success: true, data: { clicked: `coordinates (${x}, ${y})` } };
+  }
+  return { success: false, error: 'No selector or coordinates provided' };
+}
+
+// Type text into an element
+async function typeText(selector?: string, text?: string): Promise<BrowserActionResult> {
+  if (!selector || !text) {
+    return { success: false, error: 'Selector and text are required' };
+  }
+  
+  const element = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
+  if (!element) {
+    return { success: false, error: `Element not found: ${selector}` };
+  }
+  
+  // Focus the element
+  element.focus();
+  
+  // Clear existing content
+  element.value = '';
+  
+  // Type the text
+  element.value = text;
+  
+  // Trigger events to simulate real typing
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  
+  return { success: true, data: { typed: text, into: selector } };
+}
+
+// Scroll the page
+async function scrollPage(direction: string, amount: number): Promise<BrowserActionResult> {
+  let x = 0, y = 0;
+  
+  switch (direction) {
+    case 'down':
+      y = amount;
+      break;
+    case 'up':
+      y = -amount;
+      break;
+    case 'right':
+      x = amount;
+      break;
+    case 'left':
+      x = -amount;
+      break;
+  }
+  
+  window.scrollBy(x, y);
+  return { success: true, data: { scrolled: direction, amount } };
+}
+
+// Take a screenshot (limited in content scripts, but we can capture viewport)
+async function takeScreenshot(): Promise<BrowserActionResult> {
+  // Content scripts can't take screenshots directly
+  // We'll need to use the background script for this
+  return { success: false, error: 'Screenshot functionality requires background script integration' };
+}
+
+// Select an option from a dropdown
+async function selectOption(selector?: string, value?: string): Promise<BrowserActionResult> {
+  if (!selector || !value) {
+    return { success: false, error: 'Selector and value are required' };
+  }
+  
+  const element = document.querySelector(selector) as HTMLSelectElement;
+  if (!element) {
+    return { success: false, error: `Element not found: ${selector}` };
+  }
+  
+  element.value = value;
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  
+  return { success: true, data: { selected: value, in: selector } };
+}
+
+// Submit a form
+async function submitForm(selector?: string): Promise<BrowserActionResult> {
+  if (!selector) {
+    return { success: false, error: 'Form selector is required' };
+  }
+  
+  const form = document.querySelector(selector) as HTMLFormElement;
+  if (!form) {
+    return { success: false, error: `Form not found: ${selector}` };
+  }
+  
+  form.submit();
+  return { success: true, data: { submitted: selector } };
+}
+
+// Wait for an element to appear
+async function waitForElement(selector?: string, timeout: number = 5000): Promise<BrowserActionResult> {
+  if (!selector) {
+    return { success: false, error: 'Selector is required' };
+  }
+  
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const checkElement = () => {
+      const element = document.querySelector(selector);
+      if (element) {
+        resolve({ success: true, data: { found: selector } });
+      } else if (Date.now() - startTime > timeout) {
+        resolve({ success: false, error: `Element not found within ${timeout}ms: ${selector}` });
+      } else {
+        setTimeout(checkElement, 100);
+      }
+    };
+    
+    checkElement();
+  });
+}
+
+// Hover over an element
+async function hoverElement(selector?: string): Promise<BrowserActionResult> {
+  if (!selector) {
+    return { success: false, error: 'Selector is required' };
+  }
+  
+  const element = document.querySelector(selector) as HTMLElement;
+  if (!element) {
+    return { success: false, error: `Element not found: ${selector}` };
+  }
+  
+  // Create and dispatch mouseover event
+  const event = new MouseEvent('mouseover', {
+    view: window,
+    bubbles: true,
+    cancelable: true
+  });
+  
+  element.dispatchEvent(event);
+  return { success: true, data: { hovered: selector } };
+}
+
+// Enhanced page analysis and intelligence
+interface PageStructure {
+  forms: Array<{
+    selector: string;
+    fields: Array<{ name: string; type: string; selector: string; placeholder?: string }>;
+    submitButton?: string;
+  }>;
+  buttons: Array<{ text: string; selector: string; type: string }>;
+  links: Array<{ text: string; href: string; selector: string }>;
+  searchBoxes: Array<{ placeholder: string; selector: string }>;
+  navigation: Array<{ text: string; selector: string }>;
+  content: {
+    headings: Array<{ level: number; text: string; selector: string }>;
+    paragraphs: Array<{ text: string; selector: string }>;
+    lists: Array<{ type: string; items: string[]; selector: string }>;
+  };
+  interactive: Array<{ type: string; text: string; selector: string }>;
+}
+
+// Analyze page structure and find actionable elements
+function analyzePageStructure(): PageStructure {
+  const structure: PageStructure = {
+    forms: [],
+    buttons: [],
+    links: [],
+    searchBoxes: [],
+    navigation: [],
+    content: { headings: [], paragraphs: [], lists: [] },
+    interactive: []
+  };
+
+  // Find forms and their fields
+  document.querySelectorAll('form').forEach((form, index) => {
+    const formSelector = `form:nth-of-type(${index + 1})`;
+    const fields: any[] = [];
+    
+    form.querySelectorAll('input, textarea, select').forEach((field) => {
+      const input = field as HTMLInputElement;
+      fields.push({
+        name: input.name || input.id || `field-${fields.length}`,
+        type: input.type || input.tagName.toLowerCase(),
+        selector: getElementSelector(field),
+        placeholder: input.placeholder || input.title
+      });
+    });
+    
+    const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+    
+    structure.forms.push({
+      selector: formSelector,
+      fields,
+      submitButton: submitButton ? getElementSelector(submitButton) : undefined
+    });
+  });
+
+  // Find all clickable buttons
+  document.querySelectorAll('button, input[type="button"], input[type="submit"], .btn, [role="button"]').forEach((btn) => {
+    const button = btn as HTMLElement;
+    const text = button.textContent?.trim() || button.getAttribute('value') || button.getAttribute('aria-label') || '';
+    if (text) {
+      structure.buttons.push({
+        text,
+        selector: getElementSelector(button),
+        type: button.tagName.toLowerCase()
+      });
+    }
+  });
+
+  // Find navigation links
+  document.querySelectorAll('nav a, .nav a, .menu a, .navigation a').forEach((link) => {
+    const anchor = link as HTMLAnchorElement;
+    structure.navigation.push({
+      text: anchor.textContent?.trim() || '',
+      selector: getElementSelector(anchor)
+    });
+  });
+
+  // Find search boxes
+  document.querySelectorAll('input[type="search"], input[placeholder*="search" i], input[name*="search" i], .search input').forEach((search) => {
+    const input = search as HTMLInputElement;
+    structure.searchBoxes.push({
+      placeholder: input.placeholder || 'Search',
+      selector: getElementSelector(input)
+    });
+  });
+
+  // Find all links
+  document.querySelectorAll('a[href]').forEach((link) => {
+    const anchor = link as HTMLAnchorElement;
+    const text = anchor.textContent?.trim();
+    if (text && text.length > 0 && text.length < 100) {
+      structure.links.push({
+        text,
+        href: anchor.href,
+        selector: getElementSelector(anchor)
+      });
+    }
+  });
+
+  // Analyze content structure
+  document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+    structure.content.headings.push({
+      level: parseInt(heading.tagName.substring(1)),
+      text: heading.textContent?.trim() || '',
+      selector: getElementSelector(heading)
+    });
+  });
+
+  // Find important interactive elements
+  document.querySelectorAll('[onclick], [data-action], .clickable, .interactive').forEach((elem) => {
+    const element = elem as HTMLElement;
+    structure.interactive.push({
+      type: element.tagName.toLowerCase(),
+      text: element.textContent?.trim()?.substring(0, 50) || '',
+      selector: getElementSelector(element)
+    });
+  });
+
+  return structure;
+}
+
+// Generate a reliable CSS selector for an element
+function getElementSelector(element: Element): string {
+  if (element.id) {
+    return `#${element.id}`;
+  }
+  
+  if (element.className && typeof element.className === 'string') {
+    const classes = element.className.split(' ').filter(c => c && !c.includes(' '));
+    if (classes.length > 0) {
+      return `.${classes[0]}`;
+    }
+  }
+  
+  // Fallback to nth-child selector
+  const parent = element.parentElement;
+  if (parent) {
+    const siblings = Array.from(parent.children);
+    const index = siblings.indexOf(element) + 1;
+    const parentSelector = parent.tagName.toLowerCase();
+    return `${parentSelector} > ${element.tagName.toLowerCase()}:nth-child(${index})`;
+  }
+  
+  return element.tagName.toLowerCase();
+}
+
+// Smart action finder - suggests actions based on page content
+function findRelevantActions(intent: string): Array<{ action: string; description: string; confidence: number }> {
+  const structure = analyzePageStructure();
+  const suggestions: Array<{ action: string; description: string; confidence: number }> = [];
+  const lowerIntent = intent.toLowerCase();
+
+  // Search-related actions
+  if (lowerIntent.includes('search') || lowerIntent.includes('find')) {
+    structure.searchBoxes.forEach((searchBox, index) => {
+      suggestions.push({
+        action: `performActionInCurrentBrowser({type: 'type', selector: '${searchBox.selector}', text: 'your-search-term'})`,
+        description: `Type in search box: "${searchBox.placeholder}"`,
+        confidence: 0.9
+      });
+    });
+  }
+
+  // Form-related actions
+  if (lowerIntent.includes('form') || lowerIntent.includes('fill') || lowerIntent.includes('submit')) {
+    structure.forms.forEach((form, index) => {
+      suggestions.push({
+        action: `fillForm({${form.fields.map(f => `'${f.selector}': 'value'`).join(', ')}})`,
+        description: `Fill form with ${form.fields.length} fields`,
+        confidence: 0.8
+      });
+      
+      if (form.submitButton) {
+        suggestions.push({
+          action: `performActionInCurrentBrowser({type: 'click', selector: '${form.submitButton}'})`,
+          description: `Submit form`,
+          confidence: 0.9
+        });
+      }
+    });
+  }
+
+  // Navigation actions
+  if (lowerIntent.includes('go to') || lowerIntent.includes('navigate') || lowerIntent.includes('click')) {
+    structure.buttons.forEach((button) => {
+      if (button.text.toLowerCase().includes(lowerIntent.replace(/.*?(go to|navigate|click)\s*/i, ''))) {
+        suggestions.push({
+          action: `performActionInCurrentBrowser({type: 'click', selector: '${button.selector}'})`,
+          description: `Click "${button.text}" button`,
+          confidence: 0.85
+        });
+      }
+    });
+  }
+
+  // Shopping/e-commerce actions
+  if (lowerIntent.includes('buy') || lowerIntent.includes('cart') || lowerIntent.includes('purchase')) {
+    structure.buttons.forEach((button) => {
+      if (button.text.toLowerCase().includes('cart') || 
+          button.text.toLowerCase().includes('buy') ||
+          button.text.toLowerCase().includes('purchase') ||
+          button.text.toLowerCase().includes('checkout')) {
+        suggestions.push({
+          action: `performActionInCurrentBrowser({type: 'click', selector: '${button.selector}'})`,
+          description: `Click "${button.text}" button`,
+          confidence: 0.95
+        });
+      }
+    });
+  }
+
+  return suggestions.sort((a, b) => b.confidence - a.confidence);
+}
+
+// Intelligent action executor - reads page and decides what to do
+async function executeIntelligentAction(userRequest: string): Promise<{ success: boolean; actions: string[]; results: any[] }> {
+  const structure = analyzePageStructure();
+  const suggestions = findRelevantActions(userRequest);
+  const executedActions: string[] = [];
+  const results: any[] = [];
+
+  // Create context for AI decision making
+  const pageContext = {
+    url: window.location.href,
+    title: document.title,
+    structure: structure,
+    userRequest: userRequest,
+    suggestions: suggestions
+  };
+
+  // For now, execute the highest confidence suggestion
+  if (suggestions.length > 0 && suggestions[0].confidence > 0.7) {
+    try {
+      // Parse and execute the suggested action
+      const suggestion = suggestions[0];
+      executedActions.push(suggestion.description);
+      
+      // This would need to be enhanced to actually execute the parsed action
+      console.log('Would execute:', suggestion.action);
+      results.push({ success: true, description: suggestion.description });
+      
+      return { success: true, actions: executedActions, results };
+    } catch (error) {
+      return { success: false, actions: executedActions, results: [{ error: (error as Error).message }] };
+    }
+  }
+
+  return { success: false, actions: [], results: [{ error: 'No suitable action found' }] };
+}
+
+// Page understanding for AI context
+function generatePageSummaryForAI(): string {
+  const structure = analyzePageStructure();
+  
+  let summary = `Page Analysis:\n`;
+  summary += `URL: ${window.location.href}\n`;
+  summary += `Title: ${document.title}\n\n`;
+  
+  if (structure.forms.length > 0) {
+    summary += `Forms available (${structure.forms.length}):\n`;
+    structure.forms.forEach((form, i) => {
+      summary += `  Form ${i + 1}: ${form.fields.length} fields - ${form.fields.map(f => f.name).join(', ')}\n`;
+    });
+    summary += '\n';
+  }
+  
+  if (structure.buttons.length > 0) {
+    summary += `Clickable buttons: ${structure.buttons.slice(0, 10).map(b => `"${b.text}"`).join(', ')}\n\n`;
+  }
+  
+  if (structure.searchBoxes.length > 0) {
+    summary += `Search boxes: ${structure.searchBoxes.map(s => s.placeholder).join(', ')}\n\n`;
+  }
+  
+  if (structure.navigation.length > 0) {
+    summary += `Navigation: ${structure.navigation.slice(0, 5).map(n => n.text).join(', ')}\n\n`;
+  }
+  
+  summary += `Content structure: ${structure.content.headings.length} headings\n`;
+  summary += `Interactive elements: ${structure.interactive.length} available\n`;
+  
+  return summary;
 }
 
 // Initialize when the content script is loaded

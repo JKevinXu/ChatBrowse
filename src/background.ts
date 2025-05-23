@@ -6,6 +6,13 @@ import { saveToStorage, loadFromStorage } from './utils';
 import OpenAI from 'openai';
 import { mcpClient } from './mcp-client';
 
+interface ChatMessage {
+  text: string;
+  sender: 'user' | 'ai';
+  timestamp: number;
+  isFromMcp: boolean;
+}
+
 let openai: OpenAI | null = null;
 
 // Track page context for LLM
@@ -539,12 +546,33 @@ async function handleUserMessage(
       ((currentPageContext && currentPageContext.tabId === tabId && currentPageContext.pageInfo.useAsContext) || 
        isSummarizeRequest);
     
+    // Get enhanced page analysis for intelligent actions
+    let pageAnalysis = '';
+    if (useContext && pageInfo && pageInfo.content) {
+      // Request page structure analysis from content script
+      try {
+        const analysisResult = await new Promise<string>((resolve) => {
+          chrome.tabs.sendMessage(tabId!, { type: 'GET_PAGE_ANALYSIS' }, (response) => {
+            if (chrome.runtime.lastError || !response) {
+              resolve('');
+            } else {
+              resolve(response.analysis || '');
+            }
+          });
+        });
+        pageAnalysis = analysisResult;
+      } catch (error) {
+        console.log('BACKGROUND: Could not get page analysis:', error);
+      }
+    }
+    
     // Log content availability information
     console.log('BACKGROUND: ===== CONTENT AVAILABILITY =====');
     console.log('BACKGROUND: Page title:', pageTitle);
     console.log('BACKGROUND: Page URL:', pageUrl);
     console.log('BACKGROUND: Is summary request:', isSummarizeRequest);
     console.log('BACKGROUND: Context enabled:', useContext);
+    console.log('BACKGROUND: Page analysis available:', !!pageAnalysis);
     console.log('BACKGROUND: Context source:', isSummarizeRequest ? 'Summary request' : 
         (currentPageContext && currentPageContext.tabId === tabId) ? 'Stored context' : 'N/A');
     console.log('BACKGROUND: Page content available:', pageInfo && !!pageInfo.content);
@@ -553,8 +581,61 @@ async function handleUserMessage(
       console.log('BACKGROUND: Content preview:', pageInfo.content.substring(0, 150) + '...');
     }
     
+    // Special handling for action-oriented requests
+    const isActionRequest = lowerText.includes('click') || lowerText.includes('fill') || 
+                           lowerText.includes('submit') || lowerText.includes('buy') ||
+                           lowerText.includes('search for') || lowerText.includes('find on this page');
+    
+    // Check if user wants intelligent action execution
+    const shouldExecuteActions = lowerText.includes('do it') || lowerText.includes('execute') || 
+                                lowerText.includes('perform the action') || lowerText.includes('take action');
+    
+    // Enhanced system prompt with action capabilities
+    if (isActionRequest && pageAnalysis) {
+      systemPrompt = `You are ChatBrowse, an AI assistant that can analyze webpages and suggest specific actions. You are currently on: "${pageTitle}" (${pageUrl}).
+
+${pageAnalysis}
+
+The user wants to perform actions on this page. Based on the page analysis above, you can:
+1. Suggest specific elements to click, fill, or interact with
+2. Provide exact CSS selectors for actions
+3. Guide the user through multi-step processes
+4. Identify the best way to accomplish their goal
+
+When suggesting actions, be specific about:
+- What element to interact with
+- What action to perform (click, type, select, etc.)
+- The exact selector or button text to use
+
+Keep responses practical and actionable.`;
+
+      // If user wants actions executed, plan and execute them
+      if (shouldExecuteActions && tabId) {
+        try {
+          const actionPlan = await planIntelligentActions(text, pageAnalysis, pageUrl, pageTitle);
+          
+          if (actionPlan.length > 0) {
+            console.log('BACKGROUND: Executing intelligent actions:', actionPlan);
+            const executionResults = await executeIntelligentActions(tabId, actionPlan);
+            
+            // Respond with both the plan and execution results
+            const actionResponse: ChatMessage = {
+              text: `I analyzed the page and executed the following actions:\n\n${executionResults}\n\nActions taken based on: ${actionPlan.map(a => a.reasoning).join(', ')}`,
+              sender: 'ai',
+              timestamp: Date.now(),
+              isFromMcp: false
+            };
+            
+            sendResponse(actionResponse);
+            return true;
+          }
+        } catch (error) {
+          console.error('BACKGROUND: Error executing intelligent actions:', error);
+        }
+      }
+    }
     // Special handling for summarization requests
-    if (isSummarizeRequest) {
+    else if (isSummarizeRequest) {
       console.log('BACKGROUND: Handling summarization request specially');
       // Modify system prompt for summarization
       systemPrompt = `You are ChatBrowse, an AI assistant that helps users browse the web. The user is asking for a summary of a webpage with title: "${pageTitle}" and URL: "${pageUrl}". Always include the title and URL in your response.`;
@@ -569,7 +650,11 @@ async function handleUserMessage(
       }
     } else if (useContext && pageInfo && pageInfo.content) {
       // Standard context for non-summarization requests
-      systemPrompt += `\n\nThe current page content is: "${pageInfo.content}"`;
+      let contextContent = pageInfo.content;
+      if (pageAnalysis) {
+        contextContent = pageAnalysis + '\n\nPage Content:\n' + pageInfo.content;
+      }
+      systemPrompt += `\n\nThe current page content is: "${contextContent}"`;
     }
     
     const messages = [
@@ -601,9 +686,13 @@ async function handleUserMessage(
     }
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      // Available models (from smartest to fastest):
+      // 'gpt-4-turbo' - Best for complex reasoning and web automation (current)
+      // 'gpt-4' - Very smart but slower than turbo  
+      // 'gpt-3.5-turbo' - Fast but less capable for complex tasks
+      model: 'gpt-4-turbo',
       messages: messages,
-      max_tokens: 500
+      max_tokens: 1500  // Increased for more detailed responses
     });
     
     // Get response
@@ -792,122 +881,126 @@ function handleClearChat(
   });
 }
 
-// Chrome extension-based navigation (works in current browser)
-async function navigateInCurrentBrowser(url: string, tabId?: number): Promise<{ success: boolean; title?: string; url?: string; content?: string; error?: string }> {
-  return new Promise((resolve) => {
-    // Normalize URL
-    let targetUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      targetUrl = 'https://' + url;
-    }
-
-    // If no tabId provided, create a new tab or use current active tab
-    if (!tabId) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs && tabs.length > 0) {
-          performNavigation(targetUrl, tabs[0].id!, resolve);
-        } else {
-          // Create new tab
-          chrome.tabs.create({ url: targetUrl, active: true }, (tab) => {
-            if (tab && tab.id) {
-              performNavigation(targetUrl, tab.id, resolve);
-            } else {
-              resolve({ success: false, error: 'Failed to create new tab' });
-            }
-          });
-        }
-      });
-    } else {
-      performNavigation(targetUrl, tabId, resolve);
-    }
-  });
-}
-
-// Helper function to perform navigation and extract content
-function performNavigation(
-  url: string, 
-  tabId: number, 
-  resolve: (result: { success: boolean; title?: string; url?: string; content?: string; error?: string }) => void
-) {
-  chrome.tabs.update(tabId, { url }, (tab) => {
-    if (chrome.runtime.lastError) {
-      resolve({ success: false, error: chrome.runtime.lastError.message || 'Navigation failed' });
-      return;
-    }
-
-    // Wait for the page to load and then extract content
-    const checkTabLoaded = (attempts = 0) => {
-      if (attempts > 20) { // Max 10 seconds (20 * 500ms)
-        resolve({ success: false, error: 'Page load timeout' });
-        return;
-      }
-
-      chrome.tabs.get(tabId, (tab) => {
-        if (chrome.runtime.lastError || !tab) {
-          resolve({ success: false, error: 'Failed to get tab information' });
-          return;
-        }
-
-        if (tab.status === 'complete') {
-          // Page loaded, extract content
-          setTimeout(() => {
-            getPageInfo(tabId).then(pageInfo => {
-              if (pageInfo) {
-                resolve({
-                  success: true,
-                  title: pageInfo.title,
-                  url: pageInfo.url,
-                  content: pageInfo.content
-                });
-              } else {
-                resolve({
-                  success: true,
-                  title: tab.title || 'Unknown Title',
-                  url: tab.url || url,
-                  content: 'Content extraction not available'
-                });
-              }
-            }).catch(error => {
-              resolve({
-                success: true,
-                title: tab.title || 'Unknown Title',
-                url: tab.url || url,
-                content: `Content extraction failed: ${error.message}`
-              });
-            });
-          }, 1000); // Wait 1 second for content script to be ready
-        } else {
-          // Still loading, check again
-          setTimeout(() => checkTabLoaded(attempts + 1), 500);
-        }
-      });
-    };
-
-    checkTabLoaded();
-  });
-}
-
-// Chrome extension-based search (works in current browser)
-async function searchInCurrentBrowser(
-  query: string, 
-  searchEngine: 'google' | 'bilibili' | 'xiaohongshu' = 'google',
-  tabId?: number
-): Promise<{ success: boolean; title?: string; url?: string; content?: string; error?: string }> {
-  let searchUrl: string;
-  
-  switch (searchEngine) {
-    case 'google':
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-      break;
-    case 'bilibili':
-      searchUrl = `https://search.bilibili.com/all?keyword=${encodeURIComponent(query)}`;
-      break;
-    case 'xiaohongshu':
-      searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(query)}`;
-      break;
-    default:
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+// Intelligent action planning using AI
+async function planIntelligentActions(
+  userRequest: string,
+  pageAnalysis: string,
+  pageUrl: string,
+  pageTitle: string
+): Promise<Array<{ action: string; description: string; reasoning: string }>> {
+  if (!pageAnalysis) {
+    return [];
   }
 
-  return navigateInCurrentBrowser(searchUrl, tabId);
+  try {
+    const planningPrompt = `You are an expert web automation assistant. Analyze the following page and user request to suggest the best actions to take.
+
+Page: "${pageTitle}" (${pageUrl})
+${pageAnalysis}
+
+User Request: "${userRequest}"
+
+Based on the page structure and user intent, suggest 1-3 specific actions in this JSON format:
+[
+  {
+    "action": "click",
+    "selector": "#specific-button-id",
+    "value": "",
+    "description": "Click the Submit button",
+    "reasoning": "This button will submit the form as requested"
+  },
+  {
+    "action": "type",
+    "selector": "input[name='search']",
+    "value": "search term here",
+    "description": "Type search term in search box",
+    "reasoning": "User wants to search, this is the main search input"
+  }
+]
+
+Available actions: click, type, hover, scroll, select, submit
+Return ONLY the JSON array, no other text.`;
+
+    // Check if OpenAI is available
+    if (!openai) {
+      await initializeOpenAI();
+    }
+    
+    if (!openai) {
+      console.log('BACKGROUND: OpenAI not available for action planning');
+      return [];
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4-turbo',
+      messages: [
+        { role: 'user', content: planningPrompt }
+      ],
+      max_tokens: 1000
+    });
+    
+    const response = completion.choices[0]?.message?.content?.trim() || '';
+    
+    try {
+      const actions = JSON.parse(response);
+      if (Array.isArray(actions)) {
+        return actions;
+      }
+    } catch (parseError) {
+      console.log('BACKGROUND: Failed to parse action plan:', parseError);
+    }
+  } catch (error) {
+    console.log('BACKGROUND: Error planning actions:', error);
+  }
+  
+  return [];
 }
+
+// Execute planned actions on the current tab
+async function executeIntelligentActions(
+  tabId: number,
+  actions: Array<{ action: string; selector?: string; value?: string; description: string }>
+): Promise<string> {
+  const results: string[] = [];
+  
+  for (const actionPlan of actions) {
+    try {
+      const actionResult = await new Promise<any>((resolve) => {
+        chrome.tabs.sendMessage(tabId, { 
+          type: 'PERFORM_ACTION', 
+          action: {
+            type: actionPlan.action,
+            selector: actionPlan.selector,
+            text: actionPlan.value,
+            value: actionPlan.value
+          }
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve(response || { success: false, error: 'No response' });
+          }
+        });
+      });
+      
+      if (actionResult.success) {
+        results.push(`✅ ${actionPlan.description}`);
+      } else {
+        results.push(`❌ ${actionPlan.description}: ${actionResult.error}`);
+      }
+      
+      // Small delay between actions
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+    } catch (error) {
+      results.push(`❌ ${actionPlan.description}: ${(error as Error).message}`);
+    }
+  }
+  
+  return results.join('\n');
+}
+
+export {
+  planIntelligentActions,
+  executeIntelligentActions
+};

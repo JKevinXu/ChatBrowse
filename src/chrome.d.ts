@@ -44,6 +44,7 @@ interface Chrome {
     update: (tabId: number, updateProperties: { url?: string, active?: boolean }, callback?: (tab?: any) => void) => void;
     sendMessage: (tabId: number, message: any, callback?: (response: any) => void) => void;
     get: (tabId: number, callback: (tab: any) => void) => void;
+    captureVisibleTab: (windowId: number | undefined, options: { format: 'png' | 'jpeg' }, callback: (dataUrl: string) => void) => void;
   };
 }
 
@@ -118,6 +119,7 @@ declare namespace chrome {
     update: (tabId: number, updateProperties: { url?: string, active?: boolean }, callback?: (tab?: any) => void) => void;
     sendMessage: (tabId: number, message: any, callback?: (response: any) => void) => void;
     get: (tabId: number, callback: (tab: any) => void) => void;
+    captureVisibleTab: (windowId: number | undefined, options: { format: 'png' | 'jpeg' }, callback: (dataUrl: string) => void) => void;
   }
 
   export const runtime: Runtime;
