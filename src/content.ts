@@ -383,6 +383,16 @@ function setupMessageListeners() {
       return true;
     }
     
+    // Add enhanced action execution - INTELLIGENT ACTION SYSTEM
+    if (request.type === 'EXECUTE_ACTION') {
+      executeEnhancedAction(request.action).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      return true;
+    }
+    
     // For other action types, return a default response
     sendResponse({ success: false, error: 'Unknown action type' });
     return true;
@@ -895,6 +905,340 @@ function generatePageSummaryForAI(): string {
   summary += `Interactive elements: ${structure.interactive.length} available\n`;
   
   return summary;
+}
+
+// Add enhanced action execution - INTELLIGENT ACTION SYSTEM
+interface ActionPlan {
+  type: string;
+  selector: string;
+  value?: string;
+  description: string;
+  confidence: number;
+}
+
+interface ActionResult {
+  success: boolean;
+  error?: string;
+  data?: any;
+}
+
+async function executeEnhancedAction(action: ActionPlan): Promise<ActionResult> {
+  console.log('🤖 EXECUTING ACTION:', action);
+  
+  try {
+    switch (action.type) {
+      case 'search':
+        return await executeSmartSearch(action);
+      case 'type':
+        return await executeTypeAction(action);
+      case 'click':
+        return await executeClickAction(action);
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// AI-powered search element detection using LLM
+async function findSearchElementsWithAI(): Promise<Array<{ element: HTMLElement; selector: string; confidence: number; reason: string }>> {
+  try {
+    // Extract relevant HTML structure for AI analysis
+    const pageStructure = extractSearchRelevantHTML();
+    
+    // Send to background script for AI analysis
+    const aiAnalysis = await new Promise<any>((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'ANALYZE_SEARCH_ELEMENTS',
+        payload: {
+          html: pageStructure,
+          url: window.location.href,
+          title: document.title
+        }
+      }, (response) => {
+        resolve(response || null);
+      });
+    });
+    
+    if (!aiAnalysis || !aiAnalysis.searchElements) {
+      console.log('🤖 AI analysis failed, falling back to rule-based detection');
+      return findSearchElementsFallback();
+    }
+    
+    console.log('🤖 AI DETECTED SEARCH ELEMENTS:', aiAnalysis.searchElements);
+    
+    // Convert AI suggestions to actual elements
+    const searchElements: Array<{ element: HTMLElement; selector: string; confidence: number; reason: string }> = [];
+    
+    for (const suggestion of aiAnalysis.searchElements) {
+      try {
+        const element = document.querySelector(suggestion.selector) as HTMLInputElement;
+        if (element) {
+          searchElements.push({
+            element,
+            selector: suggestion.selector,
+            confidence: suggestion.confidence,
+            reason: `AI detected: ${suggestion.reason}`
+          });
+        }
+      } catch (error) {
+        console.log(`🤖 Invalid AI selector: ${suggestion.selector}`);
+      }
+    }
+    
+    return searchElements.sort((a, b) => b.confidence - a.confidence);
+    
+  } catch (error) {
+    console.error('🤖 AI search detection failed:', error);
+    return findSearchElementsFallback();
+  }
+}
+
+// Extract HTML structure relevant for search detection
+function extractSearchRelevantHTML(): string {
+  const relevantElements: string[] = [];
+  
+  // Get all input elements with their context
+  document.querySelectorAll('input').forEach((input, index) => {
+    const parent = input.closest('form, div, header, nav') || input.parentElement;
+    if (parent) {
+      // Create a simplified representation
+      const inputInfo = {
+        tag: input.tagName.toLowerCase(),
+        type: input.type || 'text',
+        name: input.name || '',
+        id: input.id || '',
+        className: input.className || '',
+        placeholder: input.placeholder || '',
+        parentTag: parent.tagName.toLowerCase(),
+        parentClass: parent.className || '',
+        parentId: parent.id || '',
+        siblings: Array.from(parent.children).map(child => child.tagName.toLowerCase()).join(',')
+      };
+      
+      relevantElements.push(`Input${index}: ${JSON.stringify(inputInfo)}`);
+    }
+  });
+  
+  // Get form structures
+  document.querySelectorAll('form').forEach((form, index) => {
+    const formInfo = {
+      tag: 'form',
+      action: form.action || '',
+      method: form.method || '',
+      className: form.className || '',
+      id: form.id || '',
+      inputs: Array.from(form.querySelectorAll('input')).length,
+      buttons: Array.from(form.querySelectorAll('button')).length
+    };
+    
+    relevantElements.push(`Form${index}: ${JSON.stringify(formInfo)}`);
+  });
+  
+  return relevantElements.join('\n');
+}
+
+// Fallback rule-based detection (original method)
+function findSearchElementsFallback(): Array<{ element: HTMLElement; selector: string; confidence: number; reason: string }> {
+  const searchElements: Array<{ element: HTMLElement; selector: string; confidence: number; reason: string }> = [];
+  
+  // Strategy 1: Look for inputs with search-related attributes
+  document.querySelectorAll('input').forEach((input, index) => {
+    const element = input as HTMLInputElement;
+    let confidence = 0;
+    let reasons: string[] = [];
+    
+    // Check various search indicators
+    if (element.type === 'search') {
+      confidence += 0.4;
+      reasons.push('type=search');
+    }
+    
+    if (element.placeholder && /search/i.test(element.placeholder)) {
+      confidence += 0.3;
+      reasons.push('search in placeholder');
+    }
+    
+    if (element.name && /search/i.test(element.name)) {
+      confidence += 0.2;
+      reasons.push('search in name');
+    }
+    
+    if (element.id && /search/i.test(element.id)) {
+      confidence += 0.2;
+      reasons.push('search in id');
+    }
+    
+    if (element.className && /search/i.test(element.className)) {
+      confidence += 0.1;
+      reasons.push('search in class');
+    }
+    
+    if (confidence > 0.1) {
+      searchElements.push({
+        element,
+        selector: getElementSelector(element),
+        confidence,
+        reason: reasons.join(', ')
+      });
+    }
+  });
+  
+  // Platform-specific fallbacks
+  const url = window.location.href;
+  
+  if (url.includes('youtube.com')) {
+    const youtubeSelectors = [
+      'input[name="search_query"]',
+      'input[placeholder*="Search" i]',
+      '#search input',
+      '.ytd-searchbox input',
+      'form[role="search"] input'
+    ];
+    
+    youtubeSelectors.forEach(selector => {
+      const element = document.querySelector(selector) as HTMLInputElement;
+      if (element && !searchElements.find(se => se.element === element)) {
+        searchElements.push({
+          element,
+          selector,
+          confidence: 0.8,
+          reason: 'YouTube fallback selector'
+        });
+      }
+    });
+  }
+  
+  return searchElements.sort((a, b) => b.confidence - a.confidence);
+}
+
+async function executeSmartSearch(action: ActionPlan): Promise<ActionResult> {
+  console.log('🔍 SMART SEARCH: Starting AI-powered search detection...');
+  
+  // Use AI to find search elements
+  const searchElements = await findSearchElementsWithAI();
+  
+  console.log('🔍 FOUND SEARCH ELEMENTS:', searchElements.map(se => ({
+    selector: se.selector,
+    confidence: se.confidence,
+    reason: se.reason
+  })));
+  
+  if (searchElements.length === 0) {
+    return { success: false, error: 'No search elements found on this page' };
+  }
+  
+  // Try search elements in order of confidence
+  for (const searchElement of searchElements) {
+    try {
+      console.log(`🔍 TRYING: ${searchElement.selector} (${searchElement.confidence} confidence - ${searchElement.reason})`);
+      
+      const element = searchElement.element as HTMLInputElement;
+      
+      // Focus and clear the search box
+      element.focus();
+      element.value = '';
+      
+      // Type the search query
+      element.value = action.value || '';
+      
+      // Trigger input events
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      // Try to submit the search
+      let submitted = false;
+      
+      // Method 1: Look for submit button near the search box
+      const form = element.closest('form');
+      if (form) {
+        const submitButton = form.querySelector('button[type="submit"], input[type="submit"], button:not([type])') as HTMLElement;
+        if (submitButton) {
+          console.log('🔍 SUBMITTING: Using form submit button');
+          submitButton.click();
+          submitted = true;
+        }
+      }
+      
+      // Method 2: Look for search icon/button next to input
+      if (!submitted) {
+        const parent = element.parentElement;
+        if (parent) {
+          const searchButton = parent.querySelector('button, [role="button"]') as HTMLElement;
+          if (searchButton) {
+            console.log('🔍 SUBMITTING: Using nearby search button');
+            searchButton.click();
+            submitted = true;
+          }
+        }
+      }
+      
+      // Method 3: Press Enter key
+      if (!submitted) {
+        console.log('🔍 SUBMITTING: Using Enter key');
+        element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        element.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+        element.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+        submitted = true;
+      }
+      
+      // Return success for the first working element
+      return {
+        success: true,
+        data: {
+          selector: searchElement.selector,
+          confidence: searchElement.confidence,
+          reason: searchElement.reason,
+          query: action.value,
+          method: submitted ? 'completed' : 'attempted'
+        }
+      };
+      
+    } catch (error) {
+      console.log(`🔍 FAILED: ${searchElement.selector} - ${error}`);
+      continue; // Try next element
+    }
+  }
+  
+  return { 
+    success: false, 
+    error: `Tried ${searchElements.length} search elements but none worked: ${searchElements.map(se => se.selector).join(', ')}` 
+  };
+}
+
+async function executeTypeAction(action: ActionPlan): Promise<ActionResult> {
+  const element = document.querySelector(action.selector) as HTMLInputElement;
+  if (!element) {
+    throw new Error(`Element not found: ${action.selector}`);
+  }
+  
+  element.focus();
+  element.value = action.value || '';
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+  
+  return { success: true, data: { typed: action.value } };
+}
+
+async function executeClickAction(action: ActionPlan): Promise<ActionResult> {
+  const element = document.querySelector(action.selector) as HTMLElement;
+  if (!element) {
+    throw new Error(`Element not found: ${action.selector}`);
+  }
+  
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  element.click();
+  
+  return { success: true, data: { clicked: action.selector } };
+}
+
+function detectCurrentPlatform(): string {
+  const url = window.location.href;
+  if (url.includes('youtube.com')) return 'youtube';
+  if (url.includes('google.com')) return 'google';
+  if (url.includes('amazon.com')) return 'amazon';
+  return 'generic';
 }
 
 // Initialize when the content script is loaded

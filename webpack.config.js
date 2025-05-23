@@ -10,6 +10,8 @@ module.exports = {
     content: './src/content.ts',
     debug: './src/debug.ts',
     settings: './src/settings.ts',
+    'action-system': './src/action-system.ts',
+    'action-content': './src/action-content.ts'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
