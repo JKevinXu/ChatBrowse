@@ -1,16 +1,25 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Base entry points (always included)
+const baseEntry = {
+  background: './src/background.ts',
+  popup: './src/popup.ts',
+  content: './src/content.ts',
+  settings: './src/settings.ts'
+};
+
+// Development-only entry points
+const devEntry = {
+  debug: './src/debug.ts'
+};
+
 module.exports = {
-  mode: 'production',
-  devtool: false,
-  entry: {
-    background: './src/background.ts',
-    popup: './src/popup.ts',
-    content: './src/content.ts',
-    debug: './src/debug.ts',
-    settings: './src/settings.ts'
-  },
+  mode: isProduction ? 'production' : 'development',
+  devtool: isProduction ? false : 'source-map',
+  entry: isProduction ? baseEntry : { ...baseEntry, ...devEntry },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
@@ -20,6 +29,12 @@ module.exports = {
       {
         test: /\.ts$/,
         use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              plugins: isProduction ? ['transform-remove-console'] : []
+            }
+          },
           {
             loader: 'ts-loader',
             options: {

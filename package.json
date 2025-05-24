@@ -4,17 +4,27 @@
   "description": "A Chrome extension that provides a chat interface for browsing websites",
   "main": "index.js",
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "watch": "webpack --config webpack.config.js --watch",
+    "build": "NODE_ENV=production webpack --config webpack.config.js",
+    "build:dev": "NODE_ENV=development webpack --config webpack.config.js",
+    "watch": "NODE_ENV=development webpack --config webpack.config.js --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["chrome-extension", "chat", "browsing", "typescript"],
+  "keywords": [
+    "chrome-extension",
+    "chat",
+    "browsing",
+    "typescript"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "openai": "^4.28.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.27.1",
+    "@types/chrome": "^0.0.323",
+    "babel-loader": "^10.0.0",
+    "babel-plugin-transform-remove-console": "^6.9.4",
     "copy-webpack-plugin": "^13.0.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
