@@ -15,7 +15,7 @@ export interface ChatSession {
 }
 
 export interface ChatCommand {
-  type: 'SEND_MESSAGE' | 'CLEAR_CHAT' | 'NAVIGATE' | 'EXTRACT_INFO' | 'SET_CONTEXT' | 'CONTENT_SCRIPT_READY';
+  type: 'SEND_MESSAGE' | 'CLEAR_CHAT' | 'NAVIGATE' | 'EXTRACT_INFO' | 'SET_CONTEXT' | 'CONTENT_SCRIPT_READY' | 'SUMMARIZE_XIAOHONGSHU_POSTS';
   payload: any;
 }
 

@@ -3,7 +3,10 @@ import { ChatResponse } from '../types';
 export class NavigationService {
   private navigationPatterns = [
     /^go to (.+)$/i,
-    /^navigate to (.+)$/i
+    /^navigate to (.+)$/i,
+    /^login to xiaohongshu$/i,
+    /^xiaohongshu login$/i,
+    /^login xiaohongshu$/i
   ];
 
   isNavigationCommand(text: string): boolean {
@@ -17,36 +20,72 @@ export class NavigationService {
     sendResponse: (response: ChatResponse) => void,
     sessionId: string
   ): Promise<void> {
-    const url = this.extractUrl(text);
-    if (!url) {
+    const lowerText = text.toLowerCase().trim();
+    
+    // Check for Xiaohongshu login commands
+    if (lowerText.includes('xiaohongshu') && lowerText.includes('login')) {
+      console.log('Navigating to Xiaohongshu login page');
+      
+      // Send immediate feedback
       sendResponse({
         type: 'MESSAGE',
         payload: {
-          text: 'Could not extract URL from navigation command.',
+          text: 'Navigating to Xiaohongshu login page...',
           sessionId
         }
       });
+
+      try {
+        const result = await this.navigate('https://www.xiaohongshu.com/signin', tabId);
+        this.sendNavigationResult(result, 'https://www.xiaohongshu.com/signin');
+      } catch (error) {
+        console.error('Xiaohongshu login navigation error:', error);
+        this.sendNavigationError('https://www.xiaohongshu.com/signin', error as Error);
+      }
       return;
     }
 
-    console.log(`Navigating to: ${url}`);
-    
-    // Send immediate feedback
+    // Extract URL from general navigation commands
+    for (const pattern of this.navigationPatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        let url = match[1].trim();
+        
+        // Add protocol if missing
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = `https://${url}`;
+        }
+        
+        console.log(`Navigating to: ${url}`);
+        
+        // Send immediate feedback
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: `Navigating to ${url}...`,
+            sessionId
+          }
+        });
+
+        try {
+          const result = await this.navigate(url, tabId);
+          this.sendNavigationResult(result, url);
+        } catch (error) {
+          console.error('Navigation error:', error);
+          this.sendNavigationError(url, error as Error);
+        }
+        return;
+      }
+    }
+
+    // If no pattern matched
     sendResponse({
       type: 'MESSAGE',
       payload: {
-        text: `Navigating to ${url}...`,
+        text: 'Could not extract URL from navigation command.',
         sessionId
       }
     });
-
-    try {
-      const result = await this.navigate(url, tabId);
-      this.sendNavigationResult(result, url);
-    } catch (error) {
-      console.error('Navigation error:', error);
-      this.sendNavigationError(url, error as Error);
-    }
   }
 
   async navigate(url: string, tabId?: number, sendResponse?: (response: ChatResponse) => void): Promise<any> {

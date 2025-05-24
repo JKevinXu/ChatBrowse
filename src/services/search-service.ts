@@ -69,10 +69,45 @@ export class SearchService {
       const url = this.searchUrls[engine](query);
       const result = await this.performSearch(url, tabId);
       
-      this.sendSearchResult(result, engine, query);
+      // Send success message back to chat
+      if (result?.success) {
+        let successMessage = `✅ Successfully navigated to ${engine} search results for "${query}".`;
+        
+        if (engine === 'xiaohongshu') {
+          if (result.newTab && result.background) {
+            successMessage = `✅ Opened Xiaohongshu search results for "${query}" in a background tab.`;
+            successMessage += `\n\n🔄 **Switch to the new tab** to view results (Ctrl/Cmd + Tab).`;
+          } else if (result.newTab) {
+            successMessage = `✅ Opened Xiaohongshu search results for "${query}" in a new tab.`;
+          }
+          successMessage += `\n\n📱 Browse the posts manually or switch tabs and ask me to help extract information.`;
+        }
+        
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: successMessage,
+            sessionId
+          }
+        });
+      } else {
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: `❌ Failed to search ${engine}: ${result.error || 'Unknown error'}`,
+            sessionId
+          }
+        });
+      }
     } catch (error) {
       console.error(`${engine} search error:`, error);
-      this.sendSearchError(engine, error as Error);
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: `❌ Error searching ${engine}: ${(error as Error).message}`,
+          sessionId
+        }
+      });
     }
   }
 
@@ -83,58 +118,28 @@ export class SearchService {
         return;
       }
       
-      chrome.tabs.update(tabId, { url }, () => {
-        if (chrome.runtime.lastError) {
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          resolve({ success: true, url });
-        }
-      });
-    });
-  }
-
-  private sendSearchResult(result: any, engine: string, query: string): void {
-    if (result?.success) {
-      const title = result.title || `${engine} Search Results`;
-      const url = result.url || this.getDefaultUrl(engine);
-      const content = result.content || `Search results for "${query}"`;
-      
-      chrome.runtime.sendMessage({
-        type: 'MCP_BROWSE_RESULT',
-        payload: {
-          title,
-          url,
-          snippet: this.truncateContent(content, 200)
-        }
-      });
-    } else {
-      this.sendSearchError(engine, new Error(result.error || 'Unknown error'));
-    }
-  }
-
-  private sendSearchError(engine: string, error: Error): void {
-    chrome.runtime.sendMessage({
-      type: 'MCP_BROWSE_RESULT',
-      payload: {
-        title: `${engine} Search Error`,
-        url: this.getDefaultUrl(engine),
-        snippet: error.message || `Failed to search ${engine}`
+      // For Xiaohongshu, open in new tab to preserve chat session
+      if (url.includes('xiaohongshu.com')) {
+        chrome.tabs.create({ 
+          url, 
+          active: false  // Open in background to keep popup open
+        }, (newTab) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve({ success: true, url, newTab: true, background: true });
+          }
+        });
+      } else {
+        // For other search engines, navigate current tab
+        chrome.tabs.update(tabId, { url }, () => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve({ success: true, url });
+          }
+        });
       }
     });
-  }
-
-  private getDefaultUrl(engine: string): string {
-    const defaults = {
-      google: 'https://www.google.com/',
-      bilibili: 'https://www.bilibili.com/',
-      xiaohongshu: 'https://www.xiaohongshu.com/explore'
-    };
-    return defaults[engine as keyof typeof defaults] || 'https://www.google.com/';
-  }
-
-  private truncateContent(content: string, maxLength: number): string {
-    return content.length > maxLength 
-      ? content.substring(0, maxLength) + '...' 
-      : content;
   }
 } 

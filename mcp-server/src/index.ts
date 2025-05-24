@@ -244,9 +244,55 @@ async function handleXiaohongshuSearch(params: XiaohongshuSearchParams): Promise
     // Navigate to Xiaohongshu explore page
     await page.goto('https://www.xiaohongshu.com/explore', { waitUntil: 'domcontentloaded' });
 
+    // Check if login is required
+    const loginRequired = await page.evaluate(() => {
+      // Check for common login indicators
+      const loginButton = document.querySelector('.login-btn, .sign-in, [class*="login"], [href*="login"]');
+      const loginModal = document.querySelector('.login-modal, .auth-modal, [class*="login-modal"]');
+      const loginRedirect = window.location.href.includes('login') || window.location.href.includes('signin');
+      
+      return !!(loginButton || loginModal || loginRedirect);
+    });
+
+    if (loginRequired) {
+      return {
+        success: false,
+        error: 'Xiaohongshu requires login. Please log in manually in the browser window that opened, then try your search again.',
+        url: page.url(),
+        title: await page.title()
+      };
+    }
+
+    // Look for search input with multiple possible selectors
+    const searchSelectors = [
+      'input#search-input',
+      'input[placeholder*="搜索"]',
+      'input[placeholder*="search"]',
+      '.search-input input',
+      '[class*="search"] input'
+    ];
+
+    let searchInputSelector = null;
+    for (const selector of searchSelectors) {
+      try {
+        await page.waitForSelector(selector, { state: 'visible', timeout: 2000 });
+        searchInputSelector = selector;
+        break;
+      } catch (e) {
+        // Continue to next selector
+      }
+    }
+
+    if (!searchInputSelector) {
+      return {
+        success: false,
+        error: 'Could not find search input on Xiaohongshu. The page structure may have changed or login may be required.',
+        url: page.url(),
+        title: await page.title()
+      };
+    }
+
     // Type the search query
-    const searchInputSelector = 'input#search-input'; // Using the ID
-    await page.waitForSelector(searchInputSelector, { state: 'visible' });
     await page.fill(searchInputSelector, query);
 
     // Submit the search (by pressing Enter in the input field)
@@ -254,31 +300,117 @@ async function handleXiaohongshuSearch(params: XiaohongshuSearchParams): Promise
 
     // Wait for search results to load
     await page.waitForLoadState('domcontentloaded');
-    // Consider waiting for a specific results container element for more robustness
-    // For Xiaohongshu, the page might transition, or content might load dynamically.
-    // A more robust wait would be for a selector that appears only on the results page.
-    // e.g., await page.waitForSelector('.note-item', { timeout: 10000 }); // Example selector for a result item
+    
+    // Wait a bit more for dynamic content to load
+    await page.waitForTimeout(3000);
 
-    // Extract content
-    const content = await page.evaluate(() => {
+    // Check if we got redirected to login page after search
+    const currentUrl = page.url();
+    if (currentUrl.includes('login') || currentUrl.includes('signin')) {
       return {
-        title: document.title,
-        text: document.body.innerText.slice(0, 5000), // Snippet of results page
-        url: window.location.href
+        success: false,
+        error: 'Xiaohongshu redirected to login page. Please log in manually and try again.',
+        url: currentUrl,
+        title: await page.title()
+      };
+    }
+
+    // Extract top 5 posts from search results
+    const posts = await page.evaluate(() => {
+      // Common selectors for Xiaohongshu posts
+      const postSelectors = [
+        'section[class*="note"]',
+        'article[class*="note"]',
+        'div[class*="note-item"]',
+        'div[class*="feed-item"]',
+        'a[class*="note"]'
+      ];
+
+      let postElements: Element[] = [];
+      
+      // Try different selectors to find posts
+      for (const selector of postSelectors) {
+        const elements = Array.from(document.querySelectorAll(selector));
+        if (elements.length > 0) {
+          postElements = elements;
+          break;
+        }
+      }
+
+      // If no specific post elements found, try generic article/section elements
+      if (postElements.length === 0) {
+        postElements = Array.from(document.querySelectorAll('article, section, [class*="card"], [class*="item"]'))
+          .filter(el => {
+            const text = el.textContent || '';
+            const hasMinText = text.length > 50;
+            const hasLink = el.querySelector('a[href*="/discovery/item/"]') || el.querySelector('a[href*="/explore/"]');
+            return hasMinText || hasLink;
+          });
+      }
+
+      // Extract content from top 5 posts
+      const extractedPosts = postElements.slice(0, 5).map((post, index) => {
+        const titleElement = post.querySelector('h1, h2, h3, [class*="title"], [class*="header"]');
+        const title = titleElement?.textContent?.trim() || `Post ${index + 1}`;
+        
+        const contentElement = post.querySelector('p, [class*="content"], [class*="text"], [class*="desc"]');
+        let content = contentElement?.textContent?.trim() || '';
+        
+        // If no specific content found, get general text from the post
+        if (!content) {
+          content = post.textContent?.trim().slice(0, 200) || 'No content available';
+        }
+        
+        // Clean up content - remove excessive whitespace
+        content = content.replace(/\s+/g, ' ').slice(0, 300);
+        
+        const linkElement = post.querySelector('a[href]');
+        const link = linkElement?.getAttribute('href') || '';
+        
+        // Extract image if available
+        const imageElement = post.querySelector('img[src]');
+        const image = imageElement?.getAttribute('src') || '';
+        
+        return {
+          index: index + 1,
+          title: title.slice(0, 100),
+          content: content,
+          link: link,
+          image: image,
+          hasContent: content.length > 10
+        };
+      }).filter(post => post.hasContent);
+
+      return {
+        posts: extractedPosts,
+        totalFound: postElements.length,
+        pageUrl: window.location.href,
+        pageTitle: document.title
       };
     });
+
+    // Prepare the response with extracted posts
+    const content = {
+      title: await page.title(),
+      url: page.url(),
+      query: query,
+      posts: posts.posts,
+      totalPostsFound: posts.totalFound,
+      extractedCount: posts.posts.length,
+      summary: `Found ${posts.totalFound} posts for "${query}". Extracted top ${posts.posts.length} posts for summarization.`
+    };
 
     return {
       success: true,
       content,
       url: page.url(),
-      title: await page.title()
+      title: `Xiaohongshu Search: ${query} (${posts.posts.length} posts extracted)`
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: `Failed to perform Xiaohongshu search: ${errorMessage}`
+      error: `Failed to perform Xiaohongshu search: ${errorMessage}. This might be due to login requirements.`
     };
   }
 }

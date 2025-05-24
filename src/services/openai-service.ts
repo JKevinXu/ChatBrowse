@@ -133,6 +133,68 @@ export class OpenAIService {
     }
   }
 
+  async summarizeXiaohongshuPosts(
+    payload: { content: any; sessionId: string },
+    sendResponse: (response: ChatResponse) => void
+  ): Promise<void> {
+    try {
+      if (!this.openai) {
+        const initialized = await this.initialize();
+        if (!initialized) {
+          sendResponse({
+            type: 'MESSAGE',
+            payload: {
+              text: 'Please set your OpenAI API key in the extension settings to enable post summarization.',
+              sessionId: payload.sessionId
+            }
+          });
+          return;
+        }
+      }
+
+      const { content } = payload;
+      
+      if (!content.posts || content.posts.length === 0) {
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: 'No posts found to summarize. Please try searching again.',
+            sessionId: payload.sessionId
+          }
+        });
+        return;
+      }
+
+      const prompt = this.createXiaohongshuSummaryPrompt(content);
+
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-4-turbo',
+        messages: [{ role: 'user', content: prompt } as const],
+        max_tokens: 2000
+      });
+
+      const summary = completion.choices[0]?.message?.content?.trim() || 'Unable to generate summary';
+
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: summary,
+          sessionId: payload.sessionId
+        }
+      });
+
+    } catch (error) {
+      console.error('Xiaohongshu post summarization failed:', error);
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: `Failed to summarize posts: ${(error as Error).message}. Please try again.`,
+          sessionId: payload.sessionId
+        }
+      });
+    }
+  }
+
   private async generateAIResponse(
     text: string,
     pageInfo: any,
@@ -244,5 +306,37 @@ CSS Selector Examples:
 - #search-input
 - .search-box input
 - input[placeholder*="Search"]`;
+  }
+
+  private createXiaohongshuSummaryPrompt(content: any): string {
+    const postsData = content.posts.map((post: any, index: number) => {
+      return `
+Post ${index + 1}:
+Title: ${post.title}
+Content: ${post.content}
+${post.link ? `Link: ${post.link}` : ''}
+---`;
+    }).join('\n');
+
+    return `You are an AI assistant helping to summarize Xiaohongshu (Little Red Book) posts. 
+
+Search Query: "${content.query}"
+Search Results: Found ${content.totalPostsFound} posts total, extracted ${content.extractedCount} posts
+Search URL: ${content.url}
+
+Posts to Summarize:
+${postsData}
+
+Please provide a comprehensive summary that includes:
+
+1. **Search Overview**: Brief description of what was searched and found
+2. **Key Themes**: Main topics and themes across the posts
+3. **Popular Content**: Most interesting or valuable insights from the posts
+4. **Summary Points**: 3-5 bullet points highlighting the most important information
+5. **Content Quality**: Assessment of the usefulness and relevance of the found content
+
+Format your response in a clear, organized manner with proper headings and make it informative for someone interested in "${content.query}" on Xiaohongshu.
+
+Focus on providing actionable insights and valuable information from the posts.`;
   }
 } 

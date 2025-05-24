@@ -282,7 +282,10 @@ class ContentScript {
 }
 
 // Initialize when DOM is ready
-if (document.readyState === 'loading') {
+// Skip initialization on extension pages
+if (window.location.protocol === 'chrome-extension:') {
+  console.log('ChatBrowse: Skipping initialization on extension page');
+} else if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     const contentScript = new ContentScript();
     contentScript.initialize();
