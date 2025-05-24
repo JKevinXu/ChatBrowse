@@ -35,6 +35,10 @@ module.exports = {
   },
   resolve: {
     extensions: ['.ts', '.js'],
+    alias: {
+      '@content': path.resolve(__dirname, 'src/content'),
+      '@services': path.resolve(__dirname, 'src/services')
+    }
   },
   optimization: {
     minimize: true
