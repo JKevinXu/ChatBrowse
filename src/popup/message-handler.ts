@@ -3,6 +3,7 @@ import { createMessage } from '../utils';
 
 export class MessageHandler {
   private onMessageReceived?: (message: Message) => void;
+  private activeRequestId?: string;
 
   constructor(onMessageReceived?: (message: Message) => void) {
     this.onMessageReceived = onMessageReceived;
@@ -25,6 +26,19 @@ export class MessageHandler {
         
         sendResponse({ received: true });
       }
+
+      // Handle multi-part responses (like Xiaohongshu summarization)
+      if (request.type === 'MESSAGE' && request.payload && request.payload.sessionId) {
+        console.log('🐛 POPUP DEBUG: Received multi-part response:', request);
+        const responseMessage = createMessage(request.payload.text, 'system');
+        
+        if (this.onMessageReceived) {
+          this.onMessageReceived(responseMessage);
+        }
+        
+        sendResponse({ received: true });
+      }
+      
       return true;
     });
   }
@@ -34,6 +48,11 @@ export class MessageHandler {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTab = tabs[0];
         
+        // Generate a unique request ID for tracking multiple responses
+        this.activeRequestId = sessionId + '_' + Date.now();
+        
+        console.log('🐛 POPUP DEBUG: Sending message:', text, 'SessionId:', sessionId);
+        
         chrome.runtime.sendMessage(
           {
             type: 'SEND_MESSAGE',
@@ -42,15 +61,21 @@ export class MessageHandler {
               sessionId,
               tabId: activeTab.id,
               tabUrl: activeTab.url,
-              tabTitle: activeTab.title
+              tabTitle: activeTab.title,
+              requestId: this.activeRequestId
             }
           },
           (response) => {
+            console.log('🐛 POPUP DEBUG: Initial response received:', response);
+            
             if (response && response.type === 'MESSAGE') {
               const systemMessage = createMessage(response.payload.text, 'system');
               resolve(systemMessage);
             } else {
-              resolve(null);
+              // For commands like Xiaohongshu summarization, the initial response might be null
+              // but we'll get additional responses via the message listener
+              const initialMessage = createMessage('Processing...', 'system');
+              resolve(initialMessage);
             }
           }
         );

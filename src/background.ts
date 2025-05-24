@@ -25,6 +25,13 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Main message listener - route all messages through the message router
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.error('🚨🚨🚨 BACKGROUND RECEIVED MESSAGE - THIS SHOULD BE VISIBLE 🚨🚨🚨');
+  console.error('Message type:', request.type);
+  console.log('🐛 DEBUG: BACKGROUND RECEIVED ANY MESSAGE');
+  console.log('🐛 DEBUG: Message type:', request.type);
+  console.log('🐛 DEBUG: Full request:', request);
+  console.log('🐛 DEBUG: Sender tab ID:', sender.tab?.id);
+  console.log('🐛 DEBUG: Sender info:', sender);
   console.log('BACKGROUND: Received message:', request.type, 'from tab:', sender.tab?.id);
 
   // Route all messages through the message router
