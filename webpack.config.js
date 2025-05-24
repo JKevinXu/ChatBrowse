@@ -9,9 +9,7 @@ module.exports = {
     popup: './src/popup.ts',
     content: './src/content.ts',
     debug: './src/debug.ts',
-    settings: './src/settings.ts',
-    'action-system': './src/action-system.ts',
-    'action-content': './src/action-content.ts'
+    settings: './src/settings.ts'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

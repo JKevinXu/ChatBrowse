@@ -5,8 +5,9 @@
 I've successfully implemented the intelligent action execution system for ChatBrowse! Here's what works:
 
 ### **📁 New Files Created:**
-- `src/action-system.ts` - Core action planning and management
-- `src/action-content.ts` - Page manipulation and execution
+- `src/background.ts` - Service worker that manages extension lifecycle
+- `src/services/action-service.ts` - Core action planning and management
+- `src/content/action-executor.ts` - Page manipulation and execution
 - Updated `webpack.config.js` to build these files
 
 ### **🎯 Core Functionality:**
