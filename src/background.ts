@@ -1,23 +1,20 @@
 console.log('BACKGROUND SCRIPT STARTING');
 
-import { saveToStorage } from './utils';
 import { MessageRouter } from './services/message-router';
 import { OpenAIService } from './services/openai-service';
+import { ConfigService } from './services/config-service';
 import { mcpClient } from './mcp-client';
 
 // Create service instances
 const messageRouter = new MessageRouter();
 const openaiService = new OpenAIService();
+const configService = ConfigService.getInstance();
 
 // Initialize the extension when installed
-chrome.runtime.onInstalled.addListener(() => {
-  const defaultSettings = {
-    showNotifications: true,
-    openaiApiKey: ''
-  };
-  
-  saveToStorage('settings', defaultSettings);
-  openaiService.initialize();
+chrome.runtime.onInstalled.addListener(async () => {
+  // Initialize default settings
+  await configService.loadSettings();
+  await openaiService.initialize();
 });
 
 // Listen for settings changes
