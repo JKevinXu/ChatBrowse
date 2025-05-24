@@ -254,12 +254,9 @@ export class MessageRouter {
       console.log('🐛 DEBUG: Starting Xiaohongshu summary for query:', payload.query);
       console.log('🐛 DEBUG: TabId:', payload.tabId, 'SessionId:', payload.sessionId);
       
-      // Helper function to send responses both to callback and popup
-      const sendResponseToAll = (responsePayload: any) => {
-        // Send to callback (original)
-        sendResponse(responsePayload);
-        
-        // Also send to popup if this came from popup
+      // Helper function to send follow-up responses only to popup (not initial response)
+      const sendFollowUpToPopup = (responsePayload: any) => {
+        // Only send to popup if this came from popup (avoid duplication with initial response)
         if (sender.url?.includes('chrome-extension://')) {
           chrome.runtime.sendMessage(responsePayload).catch(() => {
             // Ignore errors if popup is closed
@@ -267,8 +264,8 @@ export class MessageRouter {
         }
       };
       
-      // Step 1: Perform the search
-      sendResponseToAll({
+      // Step 1: Perform the search (use normal sendResponse for initial response)
+      sendResponse({
         type: 'MESSAGE',
         payload: {
           text: `🔍 Searching Xiaohongshu for "${payload.query}" and will analyze top posts...`,
@@ -290,7 +287,7 @@ export class MessageRouter {
         console.log('🐛 DEBUG: searchService.handleSearch completed without error');
       } catch (searchError) {
         console.error('🐛 DEBUG: Search service error:', searchError);
-        sendResponseToAll({
+        sendFollowUpToPopup({
           type: 'MESSAGE',
           payload: {
             text: `❌ Search failed: ${(searchError as Error).message}`,
@@ -306,7 +303,7 @@ export class MessageRouter {
       setTimeout(async () => {
         console.log('🐛 DEBUG: Starting analysis after 3 seconds');
         try {
-          sendResponseToAll({
+          sendFollowUpToPopup({
             type: 'MESSAGE',
             payload: {
               text: '📱 Page should be loaded now. Extracting posts...',
@@ -319,14 +316,14 @@ export class MessageRouter {
           // Step 3: Extract the posts with error handling
           await this.handleXiaohongshuExtraction(payload.tabId, (extractResponse) => {
             console.log('🐛 DEBUG: Extract response received:', extractResponse);
-            sendResponseToAll(extractResponse);
+            sendFollowUpToPopup(extractResponse);
           }, payload.sessionId || 'default');
 
           console.log('🐛 DEBUG: handleXiaohongshuExtraction completed');
 
         } catch (extractError) {
           console.error('🐛 DEBUG: Analysis phase error:', extractError);
-          sendResponseToAll({
+          sendFollowUpToPopup({
             type: 'MESSAGE',
             payload: {
               text: `❌ Analysis failed: ${(extractError as Error).message}. Try switching to the Xiaohongshu tab and running "extract xiaohongshu posts" manually.`,
