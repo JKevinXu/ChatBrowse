@@ -2,13 +2,20 @@ import { BaseExtractor, ExtractionResult, ExtractedPost } from './base-extractor
 
 export class XiaohongshuExtractor extends BaseExtractor {
   platform = 'xiaohongshu';
+  
+  // Rate limiting properties
+  private static readonly RATE_LIMIT_DELAY = 7000; // 7 seconds between requests
+  private static readonly MAX_ARTICLES_PER_BATCH = 2; // Maximum 2 articles per batch
+  private static lastRequestTime = 0;
+  private static requestCount = 0;
 
   canHandle(): boolean {
     return window.location.hostname.includes('xiaohongshu.com');
   }
 
+  // Synchronous method (required by base class)
   extractPosts(maxPosts: number = 5, fetchFullContent: boolean = false): ExtractionResult {
-    this.logDebug('Starting post extraction, maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
+    this.logDebug('⚠️ Using legacy sync extraction (no rate limiting)');
     
     const posts: ExtractedPost[] = [];
     
@@ -51,7 +58,7 @@ export class XiaohongshuExtractor extends BaseExtractor {
 
     this.logDebug('Final postElements count:', postElements.length);
 
-    // Extract top posts
+    // Extract top posts (legacy behavior)
     postElements.slice(0, maxPosts).forEach((post, index) => {
       this.logDebug('Processing post', index + 1);
       
@@ -76,12 +83,125 @@ export class XiaohongshuExtractor extends BaseExtractor {
     return result;
   }
 
-  private extractSinglePost(post: Element, index: number, fetchFullContent: boolean = false): ExtractedPost | null {
+  // Asynchronous method with rate limiting
+  async extractPostsAsync(maxPosts: number = 5, fetchFullContent: boolean = false): Promise<ExtractionResult> {
+    this.logDebug('🚦 Starting rate-limited post extraction');
+    this.logDebug('📊 Rate limit settings: max articles =', XiaohongshuExtractor.MAX_ARTICLES_PER_BATCH, 'delay =', XiaohongshuExtractor.RATE_LIMIT_DELAY / 1000, 'seconds');
+    
+    // Apply rate limiting constraints
+    const rateLimitedMaxPosts = Math.min(maxPosts, XiaohongshuExtractor.MAX_ARTICLES_PER_BATCH);
+    this.logDebug('📉 Adjusted maxPosts from', maxPosts, 'to', rateLimitedMaxPosts, 'due to rate limiting');
+    
+    const posts: ExtractedPost[] = [];
+    
+    // Try different selectors to find posts
+    const postSelectors = [
+      'section[class*="note-item"]', // Based on user's HTML
+      'section[class*="note"]',
+      'article[class*="note"]', 
+      'div[class*="note-item"]',
+      'div[class*="feed-item"]',
+      'a[class*="note"]',
+      '.note-item',
+      '.feed-item'
+    ];
+
+    let postElements: Element[] = [];
+    
+    // Try different selectors to find posts
+    for (const selector of postSelectors) {
+      this.logDebug('Trying selector:', selector);
+      const elements = Array.from(document.querySelectorAll(selector));
+      this.logDebug('Found elements:', elements.length);
+      if (elements.length > 0) {
+        postElements = elements;
+        this.logDebug('Using selector:', selector, 'Found:', elements.length);
+        break;
+      }
+    }
+
+    // If no specific selectors work, try generic approaches
+    if (postElements.length === 0) {
+      this.logDebug('No specific selectors worked, trying generic approach');
+      postElements = Array.from(document.querySelectorAll('article, section, [class*="card"], [class*="item"]'))
+        .filter(el => {
+          const text = el.textContent || '';
+          return text.length > 50;
+        });
+      this.logDebug('Generic approach found:', postElements.length);
+    }
+
+    this.logDebug('Final postElements count:', postElements.length);
+
+    // Extract posts with rate limiting
+    const postsToProcess = postElements.slice(0, rateLimitedMaxPosts);
+    this.logDebug('🔄 Processing', postsToProcess.length, 'posts with rate limiting');
+    
+    for (let i = 0; i < postsToProcess.length; i++) {
+      const post = postsToProcess[i];
+      const index = i + 1;
+      
+      // Apply rate limiting delay before processing each post (except the first)
+      if (i > 0) {
+        this.logDebug('⏱️ Applying', XiaohongshuExtractor.RATE_LIMIT_DELAY / 1000, 'second delay before processing post', index);
+        await this.waitForRateLimit();
+      }
+      
+      this.logDebug('🔍 Processing post', index, 'of', postsToProcess.length);
+      
+      const extractedPost = await this.extractSinglePostWithRateLimit(post, index, fetchFullContent);
+      if (extractedPost) {
+        posts.push(extractedPost);
+        this.logDebug('✅ Post', index, 'added to results');
+      } else {
+        this.logDebug('⚠️ Post', index, 'skipped');
+      }
+    }
+
+    const result: ExtractionResult = {
+      posts,
+      totalFound: postElements.length,
+      pageUrl: window.location.href,
+      pageTitle: document.title,
+      platform: this.platform
+    };
+    
+    this.logDebug('🎉 Rate-limited extraction completed. Processed:', posts.length, 'articles');
+    return result;
+  }
+
+  private async waitForRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - XiaohongshuExtractor.lastRequestTime;
+    
+    if (timeSinceLastRequest < XiaohongshuExtractor.RATE_LIMIT_DELAY) {
+      const waitTime = XiaohongshuExtractor.RATE_LIMIT_DELAY - timeSinceLastRequest;
+      this.logDebug('⏳ Rate limit wait:', waitTime / 1000, 'seconds remaining');
+      
+      // Show countdown to user
+      const countdownSeconds = Math.ceil(waitTime / 1000);
+      for (let i = countdownSeconds; i > 0; i--) {
+        this.logDebug('⏰ Waiting', i, 'more seconds to avoid rate limiting...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    XiaohongshuExtractor.lastRequestTime = Date.now();
+    XiaohongshuExtractor.requestCount++;
+    this.logDebug('📈 Rate limit updated. Total requests this session:', XiaohongshuExtractor.requestCount);
+  }
+
+  private async extractSinglePostWithRateLimit(post: Element, index: number, fetchFullContent: boolean = false): Promise<ExtractedPost | null> {
+    this.logDebug('🔍 Starting rate-limited extraction for post', index);
+    
     // Extract title
     const title = this.extractTitle(post, index);
     
     // Extract link (enhanced to get proper post URLs)
     const link = this.extractPostLink(post);
+    
+    // Extract image
+    const image = this.extractImage(post);
     
     // Extract content (preview or full based on flag)
     const content = fetchFullContent ? 
@@ -93,6 +213,7 @@ export class XiaohongshuExtractor extends BaseExtractor {
     
     this.logDebug('Post', index, 'title:', title.slice(0, 50));
     this.logDebug('Post', index, 'link:', link);
+    this.logDebug('Post', index, 'image:', image);
     this.logDebug('Post', index, 'content length:', content.length);
     this.logDebug('Post', index, 'content preview:', content.slice(0, 100));
     
@@ -102,6 +223,7 @@ export class XiaohongshuExtractor extends BaseExtractor {
         title: title.slice(0, 200),
         content,
         link: this.makeAbsoluteUrl(link),
+        image: this.makeAbsoluteUrl(image),
         metadata
       };
     }
@@ -271,8 +393,13 @@ export class XiaohongshuExtractor extends BaseExtractor {
   private makeAbsoluteUrl(url: string): string {
     if (!url) return '';
     if (url.startsWith('http')) return url;
+    if (url.startsWith('//')) return 'https:' + url;
     if (url.startsWith('/')) {
       return 'https://www.xiaohongshu.com' + url;
+    }
+    // Handle relative URLs
+    if (url.startsWith('./') || url.startsWith('../')) {
+      return new URL(url, window.location.href).href;
     }
     return url;
   }
@@ -450,5 +577,104 @@ export class XiaohongshuExtractor extends BaseExtractor {
     });
     
     return Object.keys(metadata).length > 0 ? metadata : undefined;
+  }
+
+  private extractImage(post: Element): string {
+    this.logDebug('Extracting image from post');
+    
+    // Try different image selectors
+    const imageSelectors = [
+      'img[src]', // Any image with src
+      '.cover img[src]', // Cover images
+      '[class*="image"] img[src]', // Image containers
+      '[class*="pic"] img[src]', // Picture containers
+      '[class*="photo"] img[src]', // Photo containers
+      'picture img[src]', // Picture elements
+      '.note-image img[src]' // Note images
+    ];
+    
+    this.logDebug('Testing image selectors:', imageSelectors);
+    
+    for (const selector of imageSelectors) {
+      const imgElement = post.querySelector(selector) as HTMLImageElement;
+      if (imgElement?.src) {
+        this.logDebug('Found image with selector:', selector, 'URL:', imgElement.src);
+        this.logDebug('Image dimensions:', imgElement.width, 'x', imgElement.height);
+        
+        // Skip very small images (likely icons or UI elements)
+        if (imgElement.width > 50 && imgElement.height > 50) {
+          this.logDebug('✅ Image accepted (size check passed)');
+          return imgElement.src;
+        }
+        
+        // If we can't check dimensions, try to filter by URL patterns
+        const src = imgElement.src;
+        if (src.includes('avatar') || src.includes('icon') || src.includes('logo')) {
+          this.logDebug('⚠️ Image rejected (avatar/icon/logo pattern)');
+          continue; // Skip likely UI images
+        }
+        
+        this.logDebug('✅ Image accepted (pattern check passed)');
+        return src;
+      }
+    }
+    
+    // Try to find image from style backgrounds
+    this.logDebug('Checking background images...');
+    const elementsWithBackground = post.querySelectorAll('[style*="background"]');
+    this.logDebug('Found elements with background styles:', elementsWithBackground.length);
+    
+    for (const element of Array.from(elementsWithBackground)) {
+      const style = (element as HTMLElement).style.backgroundImage;
+      if (style && style.includes('url(')) {
+        const match = style.match(/url\(['"]?(.*?)['"]?\)/);
+        if (match && match[1]) {
+          this.logDebug('✅ Found background image:', match[1]);
+          return match[1];
+        }
+      }
+    }
+    
+    this.logDebug('❌ No image found in post');
+    return '';
+  }
+
+  // Synchronous single post extraction (for backward compatibility)
+  private extractSinglePost(post: Element, index: number, fetchFullContent: boolean = false): ExtractedPost | null {
+    // Extract title
+    const title = this.extractTitle(post, index);
+    
+    // Extract link (enhanced to get proper post URLs)
+    const link = this.extractPostLink(post);
+    
+    // Extract image
+    const image = this.extractImage(post);
+    
+    // Extract content (preview or full based on flag)
+    const content = fetchFullContent ? 
+      this.extractFullContentFromLink(link) : 
+      this.extractPreviewContent(post);
+    
+    // Extract metadata
+    const metadata = this.extractMetadata(post);
+    
+    this.logDebug('Post', index, 'title:', title.slice(0, 50));
+    this.logDebug('Post', index, 'link:', link);
+    this.logDebug('Post', index, 'image:', image);
+    this.logDebug('Post', index, 'content length:', content.length);
+    this.logDebug('Post', index, 'content preview:', content.slice(0, 100));
+    
+    if (content.length > 10) {
+      return {
+        index,
+        title: title.slice(0, 200),
+        content,
+        link: this.makeAbsoluteUrl(link),
+        image: this.makeAbsoluteUrl(image),
+        metadata
+      };
+    }
+    
+    return null;
   }
 } 

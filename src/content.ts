@@ -63,7 +63,18 @@ class ContentScript {
           return true;
 
         case 'EXTRACT_POSTS':
+          console.log('🔍 CONTENT: Received EXTRACT_POSTS request');
           this.handleExtractPosts(request.payload, sendResponse);
+          return true;
+
+        case 'EXTRACT_POSTS_ASYNC':
+          console.log('🔍 CONTENT: Received EXTRACT_POSTS_ASYNC request (rate-limited)');
+          this.handleExtractPostsAsync(request.payload, sendResponse);
+          return true;
+
+        case 'TEST_IMAGE_EXTRACTION':
+          console.log('🔍 CONTENT: Received TEST_IMAGE_EXTRACTION request');
+          this.handleTestImageExtraction(sendResponse);
           return true;
 
         case 'CLEAR_CHAT':
@@ -334,6 +345,136 @@ class ContentScript {
     
     // Limit total HTML size
     return html.length > 5000 ? html.substring(0, 5000) + '...' : html;
+  }
+
+  private handleTestImageExtraction(sendResponse: (response: any) => void): void {
+    try {
+      console.log('🔍 CONTENT: Testing image extraction');
+      
+      // Get all images on the page
+      const allImages = Array.from(document.querySelectorAll('img[src]')) as HTMLImageElement[];
+      console.log('🔍 CONTENT: Found', allImages.length, 'total images');
+      
+      const imageData = allImages.map((img, index) => {
+        // Find the selector path for this image
+        let selector = 'img';
+        if (img.id) {
+          selector = `#${img.id}`;
+        } else if (img.className) {
+          selector = `img.${img.className.split(' ')[0]}`;
+        } else {
+          // Try to find a parent with class or ID
+          let parent = img.parentElement;
+          let depth = 0;
+          while (parent && depth < 3) {
+            if (parent.id) {
+              selector = `#${parent.id} img`;
+              break;
+            } else if (parent.className) {
+              selector = `.${parent.className.split(' ')[0]} img`;
+              break;
+            }
+            parent = parent.parentElement;
+            depth++;
+          }
+        }
+        
+        return {
+          index: index + 1,
+          url: img.src,
+          selector: selector,
+          width: img.width || img.naturalWidth || 0,
+          height: img.height || img.naturalHeight || 0,
+          alt: img.alt || '',
+          isVisible: img.offsetWidth > 0 && img.offsetHeight > 0
+        };
+      });
+      
+      // Filter out very small images (likely icons)
+      const meaningfulImages = imageData.filter(img => 
+        img.width > 50 && 
+        img.height > 50 && 
+        img.isVisible &&
+        !img.url.includes('avatar') && 
+        !img.url.includes('icon') && 
+        !img.url.includes('logo')
+      );
+      
+      console.log('🔍 CONTENT: Found', meaningfulImages.length, 'meaningful images');
+      
+      sendResponse({
+        success: true,
+        totalImages: allImages.length,
+        meaningfulImages: meaningfulImages.length,
+        images: meaningfulImages.slice(0, 10) // Return top 10 for debugging
+      });
+      
+    } catch (error) {
+      console.error('🔍 CONTENT: Image extraction test error:', error);
+      sendResponse({
+        success: false,
+        error: (error as Error).message,
+        images: []
+      });
+    }
+  }
+
+  private async handleExtractPostsAsync(payload: any, sendResponse: (response: any) => void): Promise<void> {
+    try {
+      console.log('🔍 CONTENT: Starting async post extraction with rate limiting, payload:', payload);
+      
+      // Get the appropriate extractor for this page
+      const extractor = ExtractorFactory.getExtractor();
+      
+      if (!extractor) {
+        console.log('🔍 CONTENT: No suitable extractor found for this page');
+        sendResponse({
+          success: false,
+          error: 'No suitable extractor found for this page. Currently only Xiaohongshu is supported.',
+          posts: [],
+          totalFound: 0,
+          pageUrl: window.location.href,
+          pageTitle: document.title,
+          platform: 'unknown'
+        });
+        return;
+      }
+      
+      console.log(`🔍 CONTENT: Using ${extractor.platform} extractor with rate limiting`);
+      
+      // Check if this extractor supports async extraction
+      if (!extractor.extractPostsAsync || typeof extractor.extractPostsAsync !== 'function') {
+        console.log('🔍 CONTENT: Extractor does not support async extraction, falling back to sync');
+        this.handleExtractPosts(payload, sendResponse);
+        return;
+      }
+      
+      // Extract posts with rate limiting
+      const maxPosts = payload?.maxPosts || 2;
+      const fetchFullContent = payload?.fetchFullContent || false;
+      console.log('🔍 CONTENT: Async extraction options - maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
+      
+      const result = await extractor.extractPostsAsync(maxPosts, fetchFullContent);
+      
+      console.log('🔍 CONTENT: Async extraction completed:', result);
+      
+      sendResponse({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      console.error('🔍 CONTENT: Async extraction error:', error);
+      sendResponse({
+        success: false,
+        error: (error as Error).message,
+        posts: [],
+        totalFound: 0,
+        pageUrl: window.location.href,
+        pageTitle: document.title,
+        platform: 'unknown'
+      });
+    }
   }
 }
 

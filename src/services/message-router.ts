@@ -233,27 +233,59 @@ export class MessageRouter {
       return true;
     }
 
-    chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_POSTS', payload }, (result) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({
-          type: 'ERROR',
-          payload: { message: chrome.runtime.lastError.message || 'Failed to extract posts' }
-        });
-        return;
-      }
-      
-      if (result?.success) {
-        sendResponse({
-          type: 'EXTRACTION_RESULT',
-          payload: result
-        });
-      } else {
-        sendResponse({
-          type: 'ERROR',
-          payload: { message: result?.error || 'Post extraction failed' }
-        });
-      }
-    });
+    // Check if this is a Xiaohongshu page and use rate-limited extraction
+    if (sender.tab?.url?.includes('xiaohongshu.com')) {
+      chrome.tabs.sendMessage(tabId, { 
+        type: 'EXTRACT_POSTS_ASYNC', 
+        payload: { 
+          maxPosts: 2, // Rate-limited to 2 posts
+          fetchFullContent: payload?.fetchFullContent || false 
+        } 
+      }, (result) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({
+            type: 'ERROR',
+            payload: { message: chrome.runtime.lastError.message || 'Failed to extract posts' }
+          });
+          return;
+        }
+        
+        if (result?.success) {
+          sendResponse({
+            type: 'EXTRACTION_RESULT',
+            payload: result
+          });
+        } else {
+          sendResponse({
+            type: 'ERROR',
+            payload: { message: result?.error || 'Post extraction failed' }
+          });
+        }
+      });
+    } else {
+      // Use regular extraction for non-Xiaohongshu sites
+      chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_POSTS', payload }, (result) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({
+            type: 'ERROR',
+            payload: { message: chrome.runtime.lastError.message || 'Failed to extract posts' }
+          });
+          return;
+        }
+        
+        if (result?.success) {
+          sendResponse({
+            type: 'EXTRACTION_RESULT',
+            payload: result
+          });
+        } else {
+          sendResponse({
+            type: 'ERROR',
+            payload: { message: result?.error || 'Post extraction failed' }
+          });
+        }
+      });
+    }
 
     return true;
   }

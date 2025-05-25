@@ -13,7 +13,7 @@ export class ExtractionService {
       sendResponse({
         type: 'MESSAGE',
         payload: {
-          text: `🔍 Extracting top 5 posts (full content) from Xiaohongshu page...`,
+          text: `🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...`,
           sessionId
         }
       });
@@ -44,7 +44,7 @@ export class ExtractionService {
         // Use content script to extract posts with the proper extractor classes
         chrome.tabs.sendMessage(
           xiaohongshuTab.id!, 
-          { type: 'EXTRACT_POSTS', payload: { maxPosts: 5, fetchFullContent: true } }, // Always fetch full content
+          { type: 'EXTRACT_POSTS_ASYNC', payload: { maxPosts: 2, fetchFullContent: true } }, // Use async method with rate limiting
           async (result) => {
             console.log('🐛 DEBUG: Extract posts response:', result);
             
@@ -103,7 +103,7 @@ export class ExtractionService {
       });
 
     } catch (error) {
-      console.error('�� DEBUG: Xiaohongshu extraction error:', error);
+      console.error('🐛 DEBUG: Xiaohongshu extraction error:', error);
       return {
         success: false,
         error: (error as Error).message,

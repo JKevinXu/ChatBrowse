@@ -247,7 +247,7 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* Post Reference Hover Tooltips */
+/* Post Reference Hover Tooltips with Iframe Support */
 .chatbrowse-post-tooltip {
   background: #ffffff;
   border: 1px solid #e1e4e8;
@@ -255,6 +255,8 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-width: 400px;
   max-height: 500px;
+  min-width: 350px;
+  min-height: 300px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   font-size: 13px;
   line-height: 1.4;
@@ -263,6 +265,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  resize: both;
+  position: fixed;
 }
 
 .chatbrowse-post-tooltip .tooltip-header {
@@ -274,6 +278,7 @@
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  cursor: move; /* Allow dragging */
 }
 
 .chatbrowse-post-tooltip .tooltip-header strong {
@@ -293,19 +298,101 @@
   white-space: nowrap;
 }
 
+/* Iframe Container */
+.tooltip-iframe-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 250px;
+  max-height: 400px;
+}
+
+.iframe-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #586069;
+  font-size: 14px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 15px;
+  border-radius: 4px;
+  border: 1px solid #e1e4e8;
+}
+
+.tooltip-iframe-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0 0 7px 7px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  flex: 1;
+  min-height: 250px;
+  background: white;
+}
+
+.iframe-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Legacy image and content styling for fallback */
 .chatbrowse-post-tooltip .tooltip-image {
   flex-shrink: 0;
-  max-height: 200px;
+  max-height: 120px;
   overflow: hidden;
   border-bottom: 1px solid #e1e4e8;
+  background-color: #f6f8fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .chatbrowse-post-tooltip .tooltip-image img {
   width: 100%;
   height: auto;
-  max-height: 200px;
+  max-height: 120px;
   object-fit: cover;
   display: block;
+  background-color: #f6f8fa;
+  transition: opacity 0.2s ease;
+}
+
+.chatbrowse-post-tooltip .tooltip-image img[src=""],
+.chatbrowse-post-tooltip .tooltip-image img:not([src]) {
+  display: none;
+}
+
+.chatbrowse-post-tooltip .tooltip-image img:hover {
+  opacity: 0.9;
+}
+
+/* Hide image container if no image */
+.chatbrowse-post-tooltip .tooltip-image:empty {
+  display: none;
+}
+
+/* Loading state for images */
+.chatbrowse-post-tooltip .tooltip-image img:not([src]),
+.chatbrowse-post-tooltip .tooltip-image img[src=""] {
+  display: none;
+}
+
+/* Error handling for failed images */
+.chatbrowse-post-tooltip .tooltip-image img::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f6f8fa;
 }
 
 .chatbrowse-post-tooltip .tooltip-content {
@@ -317,7 +404,7 @@
   flex: 1;
   white-space: pre-wrap;
   word-wrap: break-word;
-  max-height: 250px;
+  max-height: 150px;
 }
 
 /* Scrollbar styling for tooltip content */
@@ -361,4 +448,36 @@ a.post-reference:hover {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.fallback-header {
+  padding: 8px 12px;
+  background: #fff3cd;
+  border-bottom: 1px solid #ffeaa7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fallback-notice {
+  font-size: 11px;
+  color: #856404;
+  flex: 1;
+}
+
+.view-full-post-btn {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.view-full-post-btn:hover {
+  background: #357ABD;
 } 

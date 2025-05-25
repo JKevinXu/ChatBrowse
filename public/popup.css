@@ -244,14 +244,16 @@ body {
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-/* Post Reference Hover Tooltips */
+/* Post Reference Hover Tooltips with Iframe Support */
 .popup-post-tooltip {
   background: #ffffff;
   border: 1px solid #e1e4e8;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-width: 350px;
+  max-width: 320px;
   max-height: 400px;
+  min-width: 280px;
+  min-height: 250px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   font-size: 12px;
   line-height: 1.4;
@@ -260,6 +262,8 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  resize: both;
+  position: fixed;
 }
 
 .popup-post-tooltip .tooltip-header {
@@ -271,6 +275,7 @@ body {
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  cursor: move;
 }
 
 .popup-post-tooltip .tooltip-header strong {
@@ -291,19 +296,133 @@ body {
   white-space: nowrap;
 }
 
+/* Iframe Container for Popup */
+.popup-post-tooltip .tooltip-iframe-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+  max-height: 320px;
+}
+
+.popup-post-tooltip .iframe-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #586069;
+  font-size: 12px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #e1e4e8;
+}
+
+.popup-post-tooltip .tooltip-iframe-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0 0 7px 7px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  flex: 1;
+  min-height: 200px;
+  background: white;
+}
+
+.popup-post-tooltip .iframe-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-post-tooltip .fallback-header {
+  padding: 6px 10px;
+  background: #fff3cd;
+  border-bottom: 1px solid #ffeaa7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.popup-post-tooltip .fallback-notice {
+  font-size: 10px;
+  color: #856404;
+  flex: 1;
+}
+
+.popup-post-tooltip .view-full-post-btn {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.popup-post-tooltip .view-full-post-btn:hover {
+  background: #357ABD;
+}
+
+/* Legacy image and content styling for fallback */
 .popup-post-tooltip .tooltip-image {
   flex-shrink: 0;
-  max-height: 150px;
+  max-height: 100px;
   overflow: hidden;
   border-bottom: 1px solid #e1e4e8;
+  background-color: #f6f8fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .popup-post-tooltip .tooltip-image img {
   width: 100%;
   height: auto;
-  max-height: 150px;
+  max-height: 100px;
   object-fit: cover;
   display: block;
+  background-color: #f6f8fa;
+  transition: opacity 0.2s ease;
+}
+
+.popup-post-tooltip .tooltip-image img[src=""],
+.popup-post-tooltip .tooltip-image img:not([src]) {
+  display: none;
+}
+
+.popup-post-tooltip .tooltip-image img:hover {
+  opacity: 0.9;
+}
+
+/* Hide image container if no image */
+.popup-post-tooltip .tooltip-image:empty {
+  display: none;
+}
+
+/* Loading state for images */
+.popup-post-tooltip .tooltip-image img:not([src]),
+.popup-post-tooltip .tooltip-image img[src=""] {
+  display: none;
+}
+
+/* Error handling for failed images */
+.popup-post-tooltip .tooltip-image img::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f6f8fa;
 }
 
 .popup-post-tooltip .tooltip-content {
@@ -316,7 +435,7 @@ body {
   flex: 1;
   white-space: pre-wrap;
   word-wrap: break-word;
-  max-height: 200px;
+  max-height: 120px;
 }
 
 /* Scrollbar styling for popup tooltip content */

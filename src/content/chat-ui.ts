@@ -293,11 +293,29 @@ export class ChatUI {
       const linkElement = link as HTMLElement;
       
       linkElement.addEventListener('mouseenter', (e) => {
+        // Cancel any existing hide timeouts
+        if ((window as any).chatBrowseHideTimeout) {
+          clearTimeout((window as any).chatBrowseHideTimeout);
+          (window as any).chatBrowseHideTimeout = null;
+        }
         this.showPostPreview(e.target as HTMLElement);
       });
       
-      linkElement.addEventListener('mouseleave', () => {
-        this.hidePostPreview();
+      linkElement.addEventListener('mouseleave', (e) => {
+        // Don't hide immediately, give time to move to tooltip
+        const relatedTarget = e.relatedTarget as HTMLElement;
+        const tooltip = document.querySelector('.chatbrowse-post-tooltip');
+        
+        // If moving to the tooltip, don't hide
+        if (tooltip && tooltip.contains(relatedTarget)) {
+          return;
+        }
+        
+        // Set a timeout to hide the tooltip
+        (window as any).chatBrowseHideTimeout = setTimeout(() => {
+          this.hidePostPreview();
+          (window as any).chatBrowseHideTimeout = null;
+        }, 200);
       });
     });
   }
@@ -310,56 +328,143 @@ export class ChatUI {
     const author = linkElement.dataset.author;
     const title = linkElement.dataset.title;
     const imageUrl = linkElement.dataset.image;
+    const postUrl = (linkElement as HTMLAnchorElement).href;
     
-    if (!fullContent) return;
+    if (!postUrl) return;
     
-    // Process content - convert \\n back to actual line breaks
-    const processedContent = fullContent.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+    // Process content - convert \\n back to actual line breaks for fallback
+    const processedContent = fullContent ? fullContent.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : '';
     
-    // Create tooltip with full content and image
+    // Create tooltip with iframe for full post preview
     const tooltip = document.createElement('div');
     tooltip.className = 'chatbrowse-post-tooltip';
     
-    let imageHTML = '';
-    if (imageUrl && imageUrl.trim()) {
-      imageHTML = `<div class="tooltip-image"><img src="${imageUrl}" alt="Post image" /></div>`;
-    }
-    
-    tooltip.innerHTML = `
+    // Create header
+    const headerHTML = `
       <div class="tooltip-header">
         <strong>${title}</strong>
         ${author ? `<span class="tooltip-author">by ${author}</span>` : ''}
       </div>
-      ${imageHTML}
-      <div class="tooltip-content">${processedContent}</div>
     `;
+    
+    // Create iframe content with fallback
+    const iframeHTML = `
+      <div class="tooltip-iframe-container">
+        <div class="iframe-loading">Loading full post...</div>
+        <iframe src="${postUrl}" 
+                frameborder="0" 
+                scrolling="yes"
+                allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
+                style="opacity:0; background: white;"
+                onload="this.previousElementSibling.style.display='none'; this.style.opacity='1'; console.log('Iframe loaded successfully');"
+                onerror="console.log('Iframe error'); this.style.display='none'; this.nextElementSibling.style.display='block';">
+        </iframe>
+        <div class="iframe-fallback" style="display: none;">
+          <div class="fallback-header">
+            <span class="fallback-notice">Preview unavailable - site blocks embedding</span>
+            <button class="view-full-post-btn" onclick="window.open('${postUrl}', '_blank'); event.stopPropagation();">
+              📖 View Full Post
+            </button>
+          </div>
+          ${imageUrl && imageUrl !== 'undefined' && imageUrl !== 'null' ? 
+            `<div class="tooltip-image">
+              <img src="${imageUrl}" alt="Post image" 
+                   onload="this.style.opacity='1'" 
+                   onerror="this.parentElement.style.display='none'" 
+                   style="opacity:0" />
+            </div>` : ''}
+          <div class="tooltip-content">${processedContent || 'Unable to load post content'}</div>
+        </div>
+      </div>
+    `;
+    
+    tooltip.innerHTML = headerHTML + iframeHTML;
     
     // Position tooltip
     const rect = linkElement.getBoundingClientRect();
     tooltip.style.position = 'fixed';
-    tooltip.style.left = `${rect.left}px`;
-    tooltip.style.top = `${rect.bottom + 5}px`;
+    tooltip.style.left = `${Math.max(10, rect.left - 200)}px`; // Center better and ensure it fits
+    tooltip.style.top = `${Math.max(10, rect.bottom + 5)}px`;
     tooltip.style.zIndex = '10000';
     
     // Add to document
     document.body.appendChild(tooltip);
     
-    // Adjust position if tooltip goes off screen
-    const tooltipRect = tooltip.getBoundingClientRect();
-    if (tooltipRect.right > window.innerWidth) {
-      tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
-    }
-    if (tooltipRect.bottom > window.innerHeight) {
-      tooltip.style.top = `${rect.top - tooltipRect.height - 5}px`;
+    // Make tooltip draggable by the header
+    this.makeDraggable(tooltip, tooltip.querySelector('.tooltip-header') as HTMLElement);
+    
+    // Improved hover handling for tooltip
+    tooltip.addEventListener('mouseenter', () => {
+      // Cancel any pending hide timeouts when entering tooltip
+      if ((window as any).chatBrowseHideTimeout) {
+        clearTimeout((window as any).chatBrowseHideTimeout);
+        (window as any).chatBrowseHideTimeout = null;
+      }
+    });
+    
+    tooltip.addEventListener('mouseleave', (e) => {
+      // Only hide if mouse is not going back to the original link
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      const originalLink = document.querySelector(`a.post-reference[href="${postUrl}"]`);
+      
+      if (!relatedTarget || (!tooltip.contains(relatedTarget) && relatedTarget !== originalLink)) {
+        (window as any).chatBrowseHideTimeout = setTimeout(() => {
+          this.hidePostPreview();
+          (window as any).chatBrowseHideTimeout = null;
+        }, 200);
+      }
+    });
+    
+    // Set up iframe error handling after adding to DOM
+    const iframe = tooltip.querySelector('iframe') as HTMLIFrameElement;
+    const loadingDiv = tooltip.querySelector('.iframe-loading') as HTMLElement;
+    const fallbackDiv = tooltip.querySelector('.iframe-fallback') as HTMLElement;
+    
+    if (iframe && loadingDiv && fallbackDiv) {
+      let hasLoaded = false;
+      
+      // More aggressive timeout - show fallback after 5 seconds (give iframe more time)
+      const loadingTimeout = setTimeout(() => {
+        if (!hasLoaded) {
+          console.log('🔍 Iframe timeout - showing fallback content');
+          loadingDiv.style.display = 'none';
+          iframe.style.display = 'none';
+          fallbackDiv.style.display = 'block';
+        }
+      }, 5000);
+      
+      // Handle successful iframe load
+      iframe.addEventListener('load', () => {
+        console.log('🔍 Iframe loaded successfully');
+        hasLoaded = true;
+        clearTimeout(loadingTimeout);
+        loadingDiv.style.display = 'none';
+        iframe.style.opacity = '1';
+      });
+      
+      // Handle iframe errors (e.g., X-Frame-Options blocking)
+      iframe.addEventListener('error', () => {
+        console.log('🔍 Iframe error - showing fallback content');
+        hasLoaded = true;
+        clearTimeout(loadingTimeout);
+        loadingDiv.style.display = 'none';
+        iframe.style.display = 'none';
+        fallbackDiv.style.display = 'block';
+      });
     }
     
-    // If still off screen (tooltip too tall), position at top of viewport
-    const finalRect = tooltip.getBoundingClientRect();
-    if (finalRect.top < 0) {
-      tooltip.style.top = '10px';
-      tooltip.style.maxHeight = `${window.innerHeight - 20}px`;
-      tooltip.style.overflowY = 'auto';
-    }
+    // Adjust position if tooltip goes off screen
+    setTimeout(() => {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      if (tooltipRect.right > window.innerWidth) {
+        tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+      }
+      if (tooltipRect.bottom > window.innerHeight) {
+        tooltip.style.top = `${Math.max(10, window.innerHeight - tooltipRect.height - 10)}px`;
+      }
+    }, 100);
   }
 
   private hidePostPreview(): void {
@@ -416,4 +521,31 @@ export class ChatUI {
       this.addMessageToChat(message);
     });
   }
-} 
+
+  private makeDraggable(element: HTMLElement, header: HTMLElement): void {
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      offsetX = e.clientX - element.getBoundingClientRect().left;
+      offsetY = e.clientY - element.getBoundingClientRect().top;
+      element.style.cursor = 'move';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      element.style.cursor = 'default';
+    });
+  }
+}

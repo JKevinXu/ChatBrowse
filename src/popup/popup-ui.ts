@@ -125,11 +125,29 @@ export class PopupUI {
       const linkElement = link as HTMLElement;
       
       linkElement.addEventListener('mouseenter', (e) => {
+        // Cancel any existing hide timeouts
+        if ((window as any).popupHideTimeout) {
+          clearTimeout((window as any).popupHideTimeout);
+          (window as any).popupHideTimeout = null;
+        }
         this.showPostPreview(e.target as HTMLElement);
       });
       
-      linkElement.addEventListener('mouseleave', () => {
-        this.hidePostPreview();
+      linkElement.addEventListener('mouseleave', (e) => {
+        // Don't hide immediately, give time to move to tooltip
+        const relatedTarget = e.relatedTarget as HTMLElement;
+        const tooltip = document.querySelector('.popup-post-tooltip');
+        
+        // If moving to the tooltip, don't hide
+        if (tooltip && tooltip.contains(relatedTarget)) {
+          return;
+        }
+        
+        // Set a timeout to hide the tooltip
+        (window as any).popupHideTimeout = setTimeout(() => {
+          this.hidePostPreview();
+          (window as any).popupHideTimeout = null;
+        }, 200);
       });
     });
   }
@@ -142,41 +160,131 @@ export class PopupUI {
     const author = linkElement.dataset.author;
     const title = linkElement.dataset.title;
     const imageUrl = linkElement.dataset.image;
+    const postUrl = (linkElement as HTMLAnchorElement).href;
     
-    if (!fullContent) return;
+    if (!postUrl) return;
     
-    // Process content - convert \\n back to actual line breaks
-    const processedContent = fullContent.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+    // Process content - convert \\n back to actual line breaks for fallback
+    const processedContent = fullContent ? fullContent.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : '';
     
-    // Create tooltip with full content and image
+    // Create tooltip with iframe for full post preview
     const tooltip = document.createElement('div');
     tooltip.className = 'popup-post-tooltip';
     
-    let imageHTML = '';
-    if (imageUrl && imageUrl.trim()) {
-      imageHTML = `<div class="tooltip-image"><img src="${imageUrl}" alt="Post image" /></div>`;
-    }
-    
-    tooltip.innerHTML = `
+    // Create header
+    const headerHTML = `
       <div class="tooltip-header">
         <strong>${title}</strong>
         ${author ? `<span class="tooltip-author">by ${author}</span>` : ''}
       </div>
-      ${imageHTML}
-      <div class="tooltip-content">${processedContent}</div>
     `;
+    
+    // Create iframe content with fallback
+    const iframeHTML = `
+      <div class="tooltip-iframe-container">
+        <div class="iframe-loading">Loading full post...</div>
+        <iframe src="${postUrl}" 
+                frameborder="0" 
+                scrolling="yes"
+                allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
+                style="opacity:0; background: white;"
+                onload="this.previousElementSibling.style.display='none'; this.style.opacity='1'; console.log('Popup iframe loaded successfully');"
+                onerror="console.log('Popup iframe error'); this.style.display='none'; this.nextElementSibling.style.display='block';">
+        </iframe>
+        <div class="iframe-fallback" style="display: none;">
+          <div class="fallback-header">
+            <span class="fallback-notice">Preview unavailable - site blocks embedding</span>
+            <button class="view-full-post-btn" onclick="window.open('${postUrl}', '_blank'); event.stopPropagation();">
+              📖 View Full Post
+            </button>
+          </div>
+          ${imageUrl && imageUrl !== 'undefined' && imageUrl !== 'null' ? 
+            `<div class="tooltip-image">
+              <img src="${imageUrl}" alt="Post image" 
+                   onload="this.style.opacity='1'" 
+                   onerror="this.parentElement.style.display='none'" 
+                   style="opacity:0" />
+            </div>` : ''}
+          <div class="tooltip-content">${processedContent || 'Unable to load post content'}</div>
+        </div>
+      </div>
+    `;
+    
+    tooltip.innerHTML = headerHTML + iframeHTML;
     
     // Position tooltip relative to popup
     const rect = linkElement.getBoundingClientRect();
     const popupRect = document.body.getBoundingClientRect();
     
-    tooltip.style.position = 'absolute';
-    tooltip.style.left = `${rect.left - popupRect.left}px`;
-    tooltip.style.top = `${rect.bottom - popupRect.top + 5}px`;
+    tooltip.style.position = 'fixed';
+    tooltip.style.left = `${Math.max(10, rect.left)}px`;
+    tooltip.style.top = `${Math.max(10, rect.bottom + 5)}px`;
     tooltip.style.zIndex = '1000';
     
     // Add to popup body
     document.body.appendChild(tooltip);
+    
+    // Improved hover handling for tooltip
+    tooltip.addEventListener('mouseenter', () => {
+      // Cancel any pending hide timeouts when entering tooltip
+      if ((window as any).popupHideTimeout) {
+        clearTimeout((window as any).popupHideTimeout);
+        (window as any).popupHideTimeout = null;
+      }
+    });
+    
+    tooltip.addEventListener('mouseleave', (e) => {
+      // Only hide if mouse is not going back to the original link
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      const originalLink = document.querySelector(`a.post-reference[href="${postUrl}"]`);
+      
+      if (!relatedTarget || (!tooltip.contains(relatedTarget) && relatedTarget !== originalLink)) {
+        (window as any).popupHideTimeout = setTimeout(() => {
+          this.hidePostPreview();
+          (window as any).popupHideTimeout = null;
+        }, 200);
+      }
+    });
+    
+    // Set up iframe error handling after adding to DOM
+    const iframe = tooltip.querySelector('iframe') as HTMLIFrameElement;
+    const loadingDiv = tooltip.querySelector('.iframe-loading') as HTMLElement;
+    const fallbackDiv = tooltip.querySelector('.iframe-fallback') as HTMLElement;
+    
+    if (iframe && loadingDiv && fallbackDiv) {
+      let hasLoaded = false;
+      
+      // Give iframe more time to load (5 seconds)
+      const loadingTimeout = setTimeout(() => {
+        if (!hasLoaded) {
+          console.log('🔍 Popup iframe timeout - showing fallback content');
+          loadingDiv.style.display = 'none';
+          iframe.style.display = 'none';
+          fallbackDiv.style.display = 'block';
+        }
+      }, 5000);
+      
+      // Handle successful iframe load
+      iframe.addEventListener('load', () => {
+        console.log('🔍 Popup iframe loaded successfully');
+        hasLoaded = true;
+        clearTimeout(loadingTimeout);
+        loadingDiv.style.display = 'none';
+        iframe.style.opacity = '1';
+      });
+      
+      // Handle iframe errors (e.g., X-Frame-Options blocking)
+      iframe.addEventListener('error', () => {
+        console.log('🔍 Popup iframe error - showing fallback content');
+        hasLoaded = true;
+        clearTimeout(loadingTimeout);
+        loadingDiv.style.display = 'none';
+        iframe.style.display = 'none';
+        fallbackDiv.style.display = 'block';
+      });
+    }
     
     // Adjust position if tooltip goes off screen within popup bounds
     const tooltipRect = tooltip.getBoundingClientRect();
@@ -195,7 +303,6 @@ export class PopupUI {
     if (finalRect.top < 0 || finalRect.height > popupHeight - 20) {
       tooltip.style.top = '10px';
       tooltip.style.maxHeight = `${popupHeight - 20}px`;
-      tooltip.style.overflowY = 'auto';
     }
   }
 
@@ -235,4 +342,4 @@ export class PopupUI {
       typingElement.remove();
     }
   }
-} 
+}
