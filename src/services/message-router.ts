@@ -404,11 +404,14 @@ export class MessageRouter {
               console.log('🐛 DEBUG: Received AI summary response:', aiResponse);
               
               if (aiResponse && aiResponse.type === 'MESSAGE' && aiResponse.payload?.text) {
-                // Send the AI-generated summary
+                // Create reference section programmatically
+                const referenceSection = this.createReferenceSection(extractionResult);
+                
+                // Send the AI-generated summary with programmatic reference section
                 sendFollowUpToPopup({
                   type: 'MESSAGE',
                   payload: {
-                    text: `📊 **${extractionResult.posts.length} 条小红书帖子 AI 总结**\n\n${aiResponse.payload.text}`,
+                    text: `📊 **${extractionResult.posts.length} 条小红书帖子 AI 总结**\n\n${aiResponse.payload.text}${referenceSection}`,
                     sessionId: payload.sessionId || 'default'
                   }
                 });
@@ -516,21 +519,49 @@ export class MessageRouter {
     contentForAI += `3. **共同趋势**: 你注意到的共同模式或趋势\n`;
     contentForAI += `4. **不同观点**: 不同的视角或方法的显著差异\n`;
     contentForAI += `5. **实用建议**: 对于对这个话题感兴趣的人的实用建议\n\n`;
-    
-    contentForAI += `**重要**: 请在总结最后添加"参考帖子"部分，使用特殊的链接格式以支持悬停预览：\n`;
-    contentForAI += `## 📚 参考帖子\n`;
-    const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
-    if (postsWithLinks.length > 0) {
-      postsWithLinks.forEach((post: any, index: number) => {
-        // Create a safe content preview for hover (first 200 chars)
-        const previewContent = post.content.slice(0, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
-        const authorInfo = post.metadata?.author ? ` - ${post.metadata.author}` : '';
-        contentForAI += `${index + 1}. <a href="${post.link}" class="post-reference" data-preview="${previewContent}" data-author="${post.metadata?.author || ''}" data-title="${post.title}">${post.title}</a>${authorInfo}\n`;
-      });
-    }
-    contentForAI += `\n请使用上述精确的HTML链接格式（包含data-preview等属性），用清晰的中文回答，使用合适的标题和格式。确保包含参考帖子链接。`;
+    contentForAI += `请用清晰的中文回答，使用合适的标题和格式。**注意：不要添加参考链接，我会在后面单独添加。**`;
     
     return contentForAI;
+  }
+
+  private createReferenceSection(extractionResult: any): string {
+    console.log('🐛 DEBUG: Creating programmatic reference section');
+    
+    const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
+    if (postsWithLinks.length === 0) {
+      return '\n\n## 📚 参考帖子\n\n暂无可用的帖子链接。';
+    }
+    
+    let referenceHTML = '\n\n## 📚 参考帖子\n\n';
+    
+    postsWithLinks.forEach((post: any, index: number) => {
+      // Properly escape content for HTML attributes
+      const fullContent = this.escapeHtmlAttribute(post.content);
+      const safeTitle = this.escapeHtmlAttribute(post.title);
+      const safeAuthor = this.escapeHtmlAttribute(post.metadata?.author || '');
+      const imageUrl = post.image || '';
+      
+      referenceHTML += `${index + 1}. <a href="${post.link}" class="post-reference" data-full-content="${fullContent}" data-author="${safeAuthor}" data-title="${safeTitle}" data-image="${imageUrl}">${post.title}</a>`;
+      
+      if (post.metadata?.author) {
+        referenceHTML += ` - ${post.metadata.author}`;
+      }
+      referenceHTML += '\n\n';
+    });
+    
+    return referenceHTML;
+  }
+
+  private escapeHtmlAttribute(text: string): string {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
   }
 
   private createManualSummary(extractionResult: any): string {
@@ -554,25 +585,11 @@ export class MessageRouter {
       summary += `\n`;
     });
 
-    // Add references section with links
-    summary += `## 📚 **参考帖子链接**\n\n`;
-    const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
-    if (postsWithLinks.length > 0) {
-      postsWithLinks.forEach((post: any, index: number) => {
-        // Create hover-enabled links with post content preview
-        const previewContent = post.content.slice(0, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
-        const authorInfo = post.metadata?.author ? post.metadata.author : '';
-        summary += `${index + 1}. <a href="${post.link}" class="post-reference" data-preview="${previewContent}" data-author="${authorInfo}" data-title="${post.title}">${post.title}</a>\n`;
-        if (post.metadata?.author) {
-          summary += `   *作者: ${post.metadata.author}*\n`;
-        }
-        summary += `\n`;
-      });
-    } else {
-      summary += `暂无可用的帖子链接。\n\n`;
-    }
+    // Add programmatically created reference section
+    const referenceSection = this.createReferenceSection(extractionResult);
+    summary += referenceSection;
 
-    summary += `💡 **注意**: 这是手动总结。AI 总结功能暂时不可用。`;
+    summary += `\n\n💡 **注意**: 这是手动总结。AI 总结功能暂时不可用。`;
     
     return summary;
   }

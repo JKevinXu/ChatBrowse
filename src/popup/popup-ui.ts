@@ -138,21 +138,32 @@ export class PopupUI {
     // Remove any existing tooltip
     this.hidePostPreview();
     
-    const preview = linkElement.dataset.preview;
+    const fullContent = linkElement.dataset.fullContent;
     const author = linkElement.dataset.author;
     const title = linkElement.dataset.title;
+    const imageUrl = linkElement.dataset.image;
     
-    if (!preview) return;
+    if (!fullContent) return;
     
-    // Create tooltip
+    // Process content - convert \\n back to actual line breaks
+    const processedContent = fullContent.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+    
+    // Create tooltip with full content and image
     const tooltip = document.createElement('div');
     tooltip.className = 'popup-post-tooltip';
+    
+    let imageHTML = '';
+    if (imageUrl && imageUrl.trim()) {
+      imageHTML = `<div class="tooltip-image"><img src="${imageUrl}" alt="Post image" /></div>`;
+    }
+    
     tooltip.innerHTML = `
       <div class="tooltip-header">
         <strong>${title}</strong>
         ${author ? `<span class="tooltip-author">by ${author}</span>` : ''}
       </div>
-      <div class="tooltip-content">${preview}${preview.length >= 200 ? '...' : ''}</div>
+      ${imageHTML}
+      <div class="tooltip-content">${processedContent}</div>
     `;
     
     // Position tooltip relative to popup
@@ -177,6 +188,14 @@ export class PopupUI {
     }
     if (tooltipRect.bottom > popupHeight) {
       tooltip.style.top = `${rect.top - popupRect.top - tooltipRect.height - 5}px`;
+    }
+    
+    // If still off screen (tooltip too tall), add scrolling
+    const finalRect = tooltip.getBoundingClientRect();
+    if (finalRect.top < 0 || finalRect.height > popupHeight - 20) {
+      tooltip.style.top = '10px';
+      tooltip.style.maxHeight = `${popupHeight - 20}px`;
+      tooltip.style.overflowY = 'auto';
     }
   }
 
