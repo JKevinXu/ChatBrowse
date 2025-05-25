@@ -18,6 +18,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/marked": "^5.0.2",
+    "marked": "^15.0.12",
     "openai": "^4.28.0"
   },
   "devDependencies": {

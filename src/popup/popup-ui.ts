@@ -1,5 +1,6 @@
 import { Message, ChatSession } from '../types';
 import { createMessage } from '../utils';
+import { marked } from 'marked';
 
 export class PopupUI {
   private chatMessages: HTMLElement | null = null;
@@ -10,6 +11,15 @@ export class PopupUI {
 
   constructor(onMessageSend?: (text: string) => void) {
     this.onMessageSend = onMessageSend;
+    this.setupMarked();
+  }
+
+  private setupMarked(): void {
+    // Configure marked for safe rendering
+    marked.setOptions({
+      breaks: true, // Convert \n to <br>
+      gfm: true // GitHub Flavored Markdown
+    });
   }
 
   initialize(): void {
@@ -25,24 +35,17 @@ export class PopupUI {
   }
 
   private setupEventListeners(): void {
-    if (this.userInput && this.sendButton) {
-      this.sendButton.addEventListener('click', () => this.handleSendMessage());
-      this.userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          this.handleSendMessage();
-        }
-      });
-    }
+    this.sendButton?.addEventListener('click', () => this.handleSendMessage());
+    
+    this.userInput?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.handleSendMessage();
+      }
+    });
 
-    if (this.settingsButton) {
-      this.settingsButton.addEventListener('click', () => {
-        if ((chrome as any)?.runtime?.openOptionsPage) {
-          (chrome as any).runtime.openOptionsPage();
-        } else if ((chrome as any)?.runtime?.getURL) {
-          window.open((chrome as any).runtime.getURL('settings.html'));
-        }
-      });
-    }
+    this.settingsButton?.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
   }
 
   private handleSendMessage(): void {
@@ -54,10 +57,36 @@ export class PopupUI {
     // Clear input
     this.userInput.value = '';
     
-    // Notify parent component
+    // Add user message to chat
+    this.addMessageToChat(createMessage(text, 'user'));
+    
+    // Notify parent
     if (this.onMessageSend) {
       this.onMessageSend(text);
     }
+  }
+
+  // Sanitize HTML to prevent XSS attacks
+  private sanitizeHTML(html: string): string {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    
+    // Remove script tags and event handlers
+    const scripts = div.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+    
+    // Remove dangerous attributes
+    const allElements = div.querySelectorAll('*');
+    allElements.forEach(element => {
+      const attributes = Array.from(element.attributes);
+      attributes.forEach(attr => {
+        if (attr.name.startsWith('on') || attr.name === 'javascript:') {
+          element.removeAttribute(attr.name);
+        }
+      });
+    });
+    
+    return div.innerHTML;
   }
 
   addMessageToChat(message: Message): void {
@@ -65,7 +94,19 @@ export class PopupUI {
     
     const messageElement = document.createElement('div');
     messageElement.className = `message ${message.sender}`;
-    messageElement.textContent = message.text;
+    
+    try {
+      // Parse markdown using marked library
+      const markdownHTML = marked.parse(message.text) as string;
+      // Sanitize the HTML for security
+      const safeHTML = this.sanitizeHTML(markdownHTML);
+      messageElement.innerHTML = safeHTML;
+    } catch (error) {
+      console.error('Error parsing markdown:', error);
+      // Fallback to plain text
+      messageElement.textContent = message.text;
+    }
+    
     messageElement.dataset.id = message.id;
     
     this.chatMessages.appendChild(messageElement);
@@ -74,33 +115,30 @@ export class PopupUI {
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
   }
 
-  renderMessages(messages: Message[]): void {
-    if (!this.chatMessages) return;
-    
-    // Clear existing messages
-    this.chatMessages.innerHTML = '';
-    
-    // Add each message to the UI
-    messages.forEach(message => {
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${message.sender}`;
-      messageElement.textContent = message.text;
-      messageElement.dataset.id = message.id;
-      
-      if (this.chatMessages) {
-        this.chatMessages.appendChild(messageElement);
-      }
-    });
-
-    // Scroll to bottom
+  clearChat(): void {
     if (this.chatMessages) {
-      this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+      this.chatMessages.innerHTML = `
+        <div class="message system">
+          Welcome to ChatBrowse! How can I help you navigate this website?
+        </div>
+      `;
     }
   }
 
-  focusInput(): void {
-    if (this.userInput) {
-      this.userInput.focus();
+  showTypingIndicator(): void {
+    const typingElement = document.createElement('div');
+    typingElement.className = 'message system typing';
+    typingElement.innerHTML = '<em>ChatBrowse is thinking...</em>';
+    typingElement.id = 'typing-indicator';
+    
+    this.chatMessages?.appendChild(typingElement);
+    this.chatMessages!.scrollTop = this.chatMessages!.scrollHeight;
+  }
+
+  hideTypingIndicator(): void {
+    const typingElement = document.getElementById('typing-indicator');
+    if (typingElement) {
+      typingElement.remove();
     }
   }
 } 
