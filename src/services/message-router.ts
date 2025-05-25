@@ -516,7 +516,16 @@ export class MessageRouter {
     contentForAI += `3. **共同趋势**: 你注意到的共同模式或趋势\n`;
     contentForAI += `4. **不同观点**: 不同的视角或方法的显著差异\n`;
     contentForAI += `5. **实用建议**: 对于对这个话题感兴趣的人的实用建议\n\n`;
-    contentForAI += `请用清晰的中文回答，使用合适的标题和格式。`;
+    
+    contentForAI += `**重要**: 请在总结最后添加"参考帖子"部分，列出所有帖子的标题和链接，格式如下：\n`;
+    contentForAI += `## 📚 参考帖子\n`;
+    const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
+    if (postsWithLinks.length > 0) {
+      postsWithLinks.forEach((post: any, index: number) => {
+        contentForAI += `${index + 1}. [${post.title}](${post.link})\n`;
+      });
+    }
+    contentForAI += `\n请用清晰的中文回答，使用合适的标题和格式。确保包含参考帖子链接。`;
     
     return contentForAI;
   }
@@ -541,6 +550,21 @@ export class MessageRouter {
       }
       summary += `\n`;
     });
+
+    // Add references section with links
+    summary += `## 📚 **参考帖子链接**\n\n`;
+    const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
+    if (postsWithLinks.length > 0) {
+      postsWithLinks.forEach((post: any, index: number) => {
+        summary += `${index + 1}. [${post.title}](${post.link})\n`;
+        if (post.metadata?.author) {
+          summary += `   *作者: ${post.metadata.author}*\n`;
+        }
+        summary += `\n`;
+      });
+    } else {
+      summary += `暂无可用的帖子链接。\n\n`;
+    }
 
     summary += `💡 **注意**: 这是手动总结。AI 总结功能暂时不可用。`;
     

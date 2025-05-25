@@ -26,7 +26,7 @@ export class OpenAIService {
 
   async handleChat(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<void> {
     const { text, sessionId, tabId: payloadTabId, tabUrl, tabTitle } = payload;
@@ -339,8 +339,15 @@ ${postsData}
 4. **要点总结**: 3-5个要点，突出最重要的信息
 5. **内容质量**: 对找到内容的有用性和相关性的评估
 
+**重要要求**: 请在总结最后添加"参考帖子"部分，格式如下：
+
+## 📚 参考帖子
+1. [帖子标题](帖子链接)
+2. [帖子标题](帖子链接)
+...
+
 请用清晰、有条理的中文回答，使用合适的标题格式，为对"${content.query}"话题感兴趣的小红书用户提供有用信息。
 
-重点提供可操作的见解和有价值的信息。`;
+重点提供可操作的见解和有价值的信息，并确保包含所有帖子的链接引用。`;
   }
 } 
