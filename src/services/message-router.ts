@@ -408,7 +408,7 @@ export class MessageRouter {
                 sendFollowUpToPopup({
                   type: 'MESSAGE',
                   payload: {
-                    text: `📊 **AI Summary of ${extractionResult.posts.length} Xiaohongshu Posts**\n\n${aiResponse.payload.text}`,
+                    text: `📊 **${extractionResult.posts.length} 条小红书帖子 AI 总结**\n\n${aiResponse.payload.text}`,
                     sessionId: payload.sessionId || 'default'
                   }
                 });
@@ -496,26 +496,27 @@ export class MessageRouter {
   private prepareContentForAI(extractionResult: any): string {
     console.log('🐛 DEBUG: Preparing content for AI summarization');
     
-    let contentForAI = `Please analyze and summarize these ${extractionResult.posts.length} Xiaohongshu posts about the topic:\n\n`;
+    let contentForAI = `请分析并总结这 ${extractionResult.posts.length} 条小红书帖子的内容：\n\n`;
     
     extractionResult.posts.forEach((post: any, index: number) => {
-      contentForAI += `**Post ${index + 1}: ${post.title}**\n`;
-      contentForAI += `Content: ${post.content}\n`;
+      contentForAI += `**帖子 ${index + 1}: ${post.title}**\n`;
+      contentForAI += `内容: ${post.content}\n`;
       if (post.metadata?.author) {
-        contentForAI += `Author: ${post.metadata.author}\n`;
+        contentForAI += `作者: ${post.metadata.author}\n`;
       }
       if (post.link) {
-        contentForAI += `Link: ${post.link}\n`;
+        contentForAI += `链接: ${post.link}\n`;
       }
       contentForAI += `\n---\n\n`;
     });
     
-    contentForAI += `Please provide:\n`;
-    contentForAI += `1. A comprehensive summary of the main topics and themes\n`;
-    contentForAI += `2. Key insights and recommendations mentioned across the posts\n`;
-    contentForAI += `3. Common patterns or trends you notice\n`;
-    contentForAI += `4. Any notable differences in perspectives or approaches\n`;
-    contentForAI += `5. Practical takeaways for someone interested in this topic`;
+    contentForAI += `请用中文提供：\n`;
+    contentForAI += `1. **主要话题总结**: 所有帖子的主要主题和话题\n`;
+    contentForAI += `2. **关键见解**: 帖子中提到的重要见解和建议\n`;
+    contentForAI += `3. **共同趋势**: 你注意到的共同模式或趋势\n`;
+    contentForAI += `4. **不同观点**: 不同的视角或方法的显著差异\n`;
+    contentForAI += `5. **实用建议**: 对于对这个话题感兴趣的人的实用建议\n\n`;
+    contentForAI += `请用清晰的中文回答，使用合适的标题和格式。`;
     
     return contentForAI;
   }
@@ -523,25 +524,25 @@ export class MessageRouter {
   private createManualSummary(extractionResult: any): string {
     console.log('🐛 DEBUG: Creating manual summary fallback');
     
-    let summary = `📱 **Manual Summary of ${extractionResult.posts.length} Xiaohongshu Posts**\n\n`;
+    let summary = `📱 **${extractionResult.posts.length} 条小红书帖子手动总结**\n\n`;
     
     // Extract key themes and topics
     const allContent = extractionResult.posts.map((post: any) => post.content).join(' ');
     const contentLength = allContent.length;
     
-    summary += `📊 **Overview**: Analyzed ${extractionResult.posts.length} posts with ${contentLength} characters of content\n\n`;
+    summary += `📊 **概览**: 分析了 ${extractionResult.posts.length} 条帖子，共 ${contentLength} 个字符的内容\n\n`;
     
-    summary += `📋 **Posts Covered**:\n`;
+    summary += `📋 **涵盖的帖子**:\n`;
     extractionResult.posts.forEach((post: any, index: number) => {
       summary += `${index + 1}. **${post.title}**\n`;
       summary += `   → ${post.content.slice(0, 150)}${post.content.length > 150 ? '...' : ''}\n`;
       if (post.metadata?.author) {
-        summary += `   → Author: ${post.metadata.author}\n`;
+        summary += `   → 作者: ${post.metadata.author}\n`;
       }
       summary += `\n`;
     });
 
-    summary += `💡 **Note**: This is a manual summary. AI summarization was not available.`;
+    summary += `💡 **注意**: 这是手动总结。AI 总结功能暂时不可用。`;
     
     return summary;
   }

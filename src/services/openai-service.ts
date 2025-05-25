@@ -167,6 +167,10 @@ export class OpenAIService {
 
       const prompt = this.createXiaohongshuSummaryPrompt(content);
 
+      if (!this.openai) {
+        throw new Error('OpenAI client not available');
+      }
+
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4-turbo',
         messages: [{ role: 'user', content: prompt } as const],
@@ -208,7 +212,7 @@ export class OpenAIService {
 
     const systemPrompt = this.createSystemPrompt(pageInfo, tabId, isSummarizeRequest);
     
-    const messages = [
+    const messages: Array<{role: 'system' | 'user', content: string}> = [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: text }
     ];
@@ -219,7 +223,7 @@ export class OpenAIService {
       max_tokens: 1500
     });
 
-    let aiResponse = completion.choices[0].message.content || 'No response generated';
+    let aiResponse = completion.choices[0]?.message?.content || 'No response generated';
 
     // For summarization requests, ensure the response includes the page title and URL
     if (isSummarizeRequest && !aiResponse.includes(pageInfo.url) && !aiResponse.includes("don't have")) {
@@ -259,7 +263,7 @@ export class OpenAIService {
     return systemPrompt;
   }
 
-  private createFallbackPageInfo(sender: chrome.MessageSender, tabUrl?: string, tabTitle?: string): any {
+  private createFallbackPageInfo(sender: chrome.runtime.MessageSender, tabUrl?: string, tabTitle?: string): any {
     return {
       title: tabTitle || 'Current Website',
       url: tabUrl || sender.tab?.url || 'the current page',
@@ -311,32 +315,32 @@ CSS Selector Examples:
   private createXiaohongshuSummaryPrompt(content: any): string {
     const postsData = content.posts.map((post: any, index: number) => {
       return `
-Post ${index + 1}:
-Title: ${post.title}
-Content: ${post.content}
-${post.link ? `Link: ${post.link}` : ''}
+帖子 ${index + 1}:
+标题: ${post.title}
+内容: ${post.content}
+${post.link ? `链接: ${post.link}` : ''}
 ---`;
     }).join('\n');
 
-    return `You are an AI assistant helping to summarize Xiaohongshu (Little Red Book) posts. 
+    return `你是一个帮助总结小红书帖子的AI助手。
 
-Search Query: "${content.query}"
-Search Results: Found ${content.totalPostsFound} posts total, extracted ${content.extractedCount} posts
-Search URL: ${content.url}
+搜索查询: "${content.query}"
+搜索结果: 总共找到 ${content.totalPostsFound} 条帖子，提取了 ${content.extractedCount} 条帖子
+搜索链接: ${content.url}
 
-Posts to Summarize:
+需要总结的帖子:
 ${postsData}
 
-Please provide a comprehensive summary that includes:
+请用中文提供全面的总结，包括：
 
-1. **Search Overview**: Brief description of what was searched and found
-2. **Key Themes**: Main topics and themes across the posts
-3. **Popular Content**: Most interesting or valuable insights from the posts
-4. **Summary Points**: 3-5 bullet points highlighting the most important information
-5. **Content Quality**: Assessment of the usefulness and relevance of the found content
+1. **搜索概览**: 简要描述搜索内容和找到的结果
+2. **主要话题**: 帖子中的主要话题和主题
+3. **热门内容**: 帖子中最有趣或最有价值的见解
+4. **要点总结**: 3-5个要点，突出最重要的信息
+5. **内容质量**: 对找到内容的有用性和相关性的评估
 
-Format your response in a clear, organized manner with proper headings and make it informative for someone interested in "${content.query}" on Xiaohongshu.
+请用清晰、有条理的中文回答，使用合适的标题格式，为对"${content.query}"话题感兴趣的小红书用户提供有用信息。
 
-Focus on providing actionable insights and valuable information from the posts.`;
+重点提供可操作的见解和有价值的信息。`;
   }
 } 

@@ -36,11 +36,11 @@ export class ChatUI {
   private addWelcomeMessage(): void {
     if (this.isXiaohongshuPage) {
       const welcomeMessage = createMessage(
-        '🎉 **Great! You\'re on Xiaohongshu now.**\n\nI can help you:\n\n' +
-        '📱 **Extract and analyze posts**\n' +
-        '🔍 **Search for specific content**\n' +
-        '📊 **Summarize trending topics**\n\n' +
-        '**Try commands like:**\n' +
+        '🎉 **太好了！您现在在小红书上了。**\n\n我可以帮助您：\n\n' +
+        '📱 **提取和分析帖子**\n' +
+        '🔍 **搜索特定内容**\n' +
+        '📊 **总结热门话题**\n\n' +
+        '**试试这些命令：**\n' +
         '• `extract xiaohongshu posts`\n' +
         '• `summarize xiaohongshu travel tips`\n' +
         '• `analyze cooking recipes`',
@@ -91,7 +91,7 @@ export class ChatUI {
     const inputArea = document.createElement('div');
     inputArea.className = 'chatbrowse-input';
     const placeholder = this.isXiaohongshuPage 
-      ? "Try: 'extract posts' or 'summarize cooking recipes'"
+      ? "试试：'extract posts' 或 'summarize cooking recipes'"
       : "Type your question or command...";
     inputArea.innerHTML = `
       <input type="text" placeholder="${placeholder}">
@@ -156,7 +156,7 @@ export class ChatUI {
       // Just navigated to Xiaohongshu
       this.updateForXiaohongshu();
       this.addMessageToChat(createMessage(
-        '🎉 **Perfect!** Now on Xiaohongshu. Ready to help you analyze content!',
+        '🎉 **完美！** 现在在小红书上。准备帮您分析内容！',
         'system'
       ));
     } else if (!this.isXiaohongshuPage && wasXiaohongshuPage) {
@@ -183,7 +183,7 @@ export class ChatUI {
     }
     
     if (input) {
-      input.placeholder = "Try: 'extract posts' or 'summarize cooking recipes'";
+      input.placeholder = "试试：'extract posts' 或 'summarize cooking recipes'";
     }
   }
 
