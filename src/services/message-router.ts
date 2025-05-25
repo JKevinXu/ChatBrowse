@@ -4,9 +4,22 @@ import { NavigationService } from './navigation-service';
 import { SearchService } from './search-service';
 import { ActionService } from './action-service';
 import { ContextService } from './context-service';
+import { ExtractionService } from './extraction-service';
 
-// Add Chrome types
-/// <reference types="chrome"/>
+// Add Chrome types with proper interface
+declare global {
+  namespace chrome {
+    namespace runtime {
+      interface MessageSender {
+        tab?: chrome.tabs.Tab;
+        frameId?: number;
+        id?: string;
+        url?: string;
+        tlsChannelId?: string;
+      }
+    }
+  }
+}
 
 export class MessageRouter {
   private openaiService = new OpenAIService();
@@ -14,10 +27,11 @@ export class MessageRouter {
   private searchService = new SearchService();
   private actionService = new ActionService();
   private contextService = new ContextService();
+  private extractionService = new ExtractionService();
 
   async route(
     request: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<boolean> {
     console.log('🐛 DEBUG: MessageRouter.route ENTERED');
@@ -41,6 +55,10 @@ export class MessageRouter {
         case 'EXTRACT_INFO':
           console.log('🐛 DEBUG: Handling EXTRACT_INFO');
           return this.handleExtraction(sender, sendResponse);
+        
+        case 'EXTRACT_POSTS':
+          console.log('🐛 DEBUG: Handling EXTRACT_POSTS');
+          return this.handlePostExtraction(request.payload, sender, sendResponse);
         
         case 'CLEAR_CHAT':
           console.log('🐛 DEBUG: Handling CLEAR_CHAT');
@@ -78,7 +96,7 @@ export class MessageRouter {
 
   private handleContentScriptReady(
     request: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: any) => void
   ): boolean {
     if (sender.tab?.id) {
@@ -91,7 +109,7 @@ export class MessageRouter {
 
   private async handleUserMessage(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<boolean> {
     console.log('🐛 DEBUG: handleUserMessage ENTERED');
@@ -144,7 +162,7 @@ export class MessageRouter {
     // Check for Xiaohongshu post extraction
     if (text.toLowerCase().includes('extract') && text.toLowerCase().includes('xiaohongshu')) {
       console.log('🐛 DEBUG: Xiaohongshu extract command detected');
-      await this.handleXiaohongshuExtraction(tabId, sendResponse, sessionId);
+      await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId);
       return true;
     }
 
@@ -163,7 +181,7 @@ export class MessageRouter {
 
   private async handleNavigation(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<boolean> {
     await this.navigationService.navigate(payload.url, sender.tab?.id, sendResponse);
@@ -171,7 +189,7 @@ export class MessageRouter {
   }
 
   private handleExtraction(
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): boolean {
     const tabId = sender.tab?.id;
@@ -201,8 +219,47 @@ export class MessageRouter {
     return true;
   }
 
+  private handlePostExtraction(
+    payload: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response: ChatResponse) => void
+  ): boolean {
+    const tabId = sender.tab?.id;
+    if (!tabId) {
+      sendResponse({
+        type: 'ERROR',
+        payload: { message: 'Could not determine tab ID' }
+      });
+      return true;
+    }
+
+    chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_POSTS', payload }, (result) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({
+          type: 'ERROR',
+          payload: { message: chrome.runtime.lastError.message || 'Failed to extract posts' }
+        });
+        return;
+      }
+      
+      if (result?.success) {
+        sendResponse({
+          type: 'EXTRACTION_RESULT',
+          payload: result
+        });
+      } else {
+        sendResponse({
+          type: 'ERROR',
+          payload: { message: result?.error || 'Post extraction failed' }
+        });
+      }
+    });
+
+    return true;
+  }
+
   private handleClearChat(
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): boolean {
     const tabId = sender.tab?.id;
@@ -226,7 +283,7 @@ export class MessageRouter {
 
   private handleSetContext(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): boolean {
     this.contextService.setContext(payload, sender.tab?.id, sendResponse);
@@ -235,7 +292,7 @@ export class MessageRouter {
 
   private async handleSearchElementAnalysis(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: any) => void
   ): Promise<boolean> {
     await this.openaiService.analyzeSearchElements(payload, sendResponse);
@@ -244,7 +301,7 @@ export class MessageRouter {
 
   private async handleXiaohongshuSummarization(
     payload: any,
-    sender: chrome.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<boolean> {
     console.log('🐛 DEBUG: handleXiaohongshuSummarization ENTERED');
@@ -301,7 +358,7 @@ export class MessageRouter {
 
       // Step 2: Wait longer for page to load, then extract
       setTimeout(async () => {
-        console.log('🐛 DEBUG: Starting analysis after 3 seconds');
+        console.log('🐛 DEBUG: Starting analysis after 7 seconds');
         try {
           sendFollowUpToPopup({
             type: 'MESSAGE',
@@ -314,12 +371,12 @@ export class MessageRouter {
           console.log('🐛 DEBUG: About to call handleXiaohongshuExtraction');
 
           // Step 3: Extract the posts with error handling
-          await this.handleXiaohongshuExtraction(payload.tabId, (extractResponse) => {
+          await this.extractionService.extractXiaohongshuPosts(payload.tabId, (extractResponse) => {
             console.log('🐛 DEBUG: Extract response received:', extractResponse);
             sendFollowUpToPopup(extractResponse);
           }, payload.sessionId || 'default');
 
-          console.log('🐛 DEBUG: handleXiaohongshuExtraction completed');
+          console.log('🐛 DEBUG: extractXiaohongshuPosts completed');
 
         } catch (extractError) {
           console.error('🐛 DEBUG: Analysis phase error:', extractError);
@@ -331,7 +388,7 @@ export class MessageRouter {
             }
           });
         }
-      }, 3000); // Wait 3 seconds for page to load
+      }, 7000); // Wait 7 seconds for page to load
 
       console.log('🐛 DEBUG: Timeout set, method ending normally');
 
@@ -348,216 +405,6 @@ export class MessageRouter {
     
     console.log('🐛 DEBUG: handleXiaohongshuSummarization EXITING');
     return true;
-  }
-
-  private async handleXiaohongshuExtraction(
-    tabId: number | undefined,
-    sendResponse: (response: ChatResponse) => void,
-    sessionId: string
-  ): Promise<void> {
-    try {
-      console.log('🐛 DEBUG: handleXiaohongshuExtraction STARTED');
-      
-      // Send immediate feedback
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: '🔍 Extracting top 5 posts from Xiaohongshu page...',
-          sessionId
-        }
-      });
-
-      // Find the Xiaohongshu tab instead of using the sender tab
-      console.log('🐛 DEBUG: Looking for Xiaohongshu tab...');
-      const xiaohongshuTab = await this.findXiaohongshuTab();
-      console.log('🐛 DEBUG: Xiaohongshu tab found:', xiaohongshuTab);
-      
-      if (!xiaohongshuTab) {
-        console.log('🐛 DEBUG: No Xiaohongshu tab found');
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: '❌ No Xiaohongshu tab found. Please search for content on Xiaohongshu first.',
-            sessionId
-          }
-        });
-        return;
-      }
-
-      console.log('🐛 DEBUG: About to inject script into tab:', xiaohongshuTab.id);
-      
-      // Inject extraction script into the Xiaohongshu page
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: xiaohongshuTab.id! },
-        func: () => {
-          console.log('🐛 SCRIPT DEBUG: Extraction script started');
-          console.log('🐛 SCRIPT DEBUG: Current URL:', window.location.href);
-          console.log('🐛 SCRIPT DEBUG: Page title:', document.title);
-          
-          // Extract posts from Xiaohongshu page
-          const posts: any[] = [];
-          
-          // Common selectors for Xiaohongshu posts
-          const postSelectors = [
-            'section[class*="note"]',
-            'article[class*="note"]', 
-            'div[class*="note-item"]',
-            'div[class*="feed-item"]',
-            'a[class*="note"]',
-            '.note-item',
-            '.feed-item'
-          ];
-
-          let postElements: Element[] = [];
-          
-          // Try different selectors to find posts
-          for (const selector of postSelectors) {
-            console.log('🐛 SCRIPT DEBUG: Trying selector:', selector);
-            const elements = Array.from(document.querySelectorAll(selector));
-            console.log('🐛 SCRIPT DEBUG: Found elements:', elements.length);
-            if (elements.length > 0) {
-              postElements = elements;
-              console.log('🐛 SCRIPT DEBUG: Using selector:', selector, 'Found:', elements.length);
-              break;
-            }
-          }
-
-          // If no specific selectors work, try generic approaches
-          if (postElements.length === 0) {
-            console.log('🐛 SCRIPT DEBUG: No specific selectors worked, trying generic approach');
-            postElements = Array.from(document.querySelectorAll('article, section, [class*="card"], [class*="item"]'))
-              .filter(el => {
-                const text = el.textContent || '';
-                return text.length > 50;
-              });
-            console.log('🐛 SCRIPT DEBUG: Generic approach found:', postElements.length);
-          }
-
-          console.log('🐛 SCRIPT DEBUG: Final postElements count:', postElements.length);
-
-          // Extract top 5 posts
-          postElements.slice(0, 5).forEach((post, index) => {
-            console.log('🐛 SCRIPT DEBUG: Processing post', index + 1);
-            
-            const titleElement = post.querySelector('h1, h2, h3, [class*="title"], [class*="header"]');
-            const title = titleElement?.textContent?.trim() || `Post ${index + 1}`;
-            
-            let content = post.textContent?.trim() || '';
-            content = content.replace(/\s+/g, ' ').slice(0, 300);
-            
-            const linkElement = post.querySelector('a[href]');
-            const link = linkElement?.getAttribute('href') || '';
-            
-            console.log('🐛 SCRIPT DEBUG: Post', index + 1, 'title:', title.slice(0, 50));
-            console.log('🐛 SCRIPT DEBUG: Post', index + 1, 'content length:', content.length);
-            
-            if (content.length > 10) {
-              posts.push({
-                index: index + 1,
-                title: title.slice(0, 100),
-                content: content,
-                link: link
-              });
-              console.log('🐛 SCRIPT DEBUG: Post', index + 1, 'added to results');
-            } else {
-              console.log('🐛 SCRIPT DEBUG: Post', index + 1, 'skipped (content too short)');
-            }
-          });
-
-          const result = {
-            posts,
-            totalFound: postElements.length,
-            pageUrl: window.location.href,
-            pageTitle: document.title
-          };
-          
-          console.log('🐛 SCRIPT DEBUG: Final result:', result);
-          return result;
-        }
-      });
-
-      console.log('🐛 DEBUG: Script execution completed, results:', results);
-      console.log('🐛 DEBUG: Results[0]:', results[0]);
-      console.log('🐛 DEBUG: Results[0].result:', results[0]?.result);
-
-      const extractedData = results[0]?.result;
-      console.log('🐛 DEBUG: ExtractedData:', extractedData);
-      
-      if (extractedData && extractedData.posts && extractedData.posts.length > 0) {
-        console.log('🐛 DEBUG: Posts found, creating summary');
-        // Create summary
-        let summary = `📱 **Xiaohongshu Posts Extracted**\n\n`;
-        summary += `🔍 **Page**: ${extractedData.pageTitle}\n`;
-        summary += `📊 **Found**: ${extractedData.totalFound} total posts, extracted top ${extractedData.posts.length}\n\n`;
-        summary += `📋 **Top Posts**:\n\n`;
-
-        extractedData.posts.forEach((post: any, index: number) => {
-          summary += `**${index + 1}. ${post.title}**\n`;
-          summary += `${post.content.slice(0, 150)}${post.content.length > 150 ? '...' : ''}\n`;
-          if (post.link) {
-            summary += `🔗 Link: ${post.link}\n`;
-          }
-          summary += `\n`;
-        });
-
-        summary += `💡 **Usage**: These are the top posts from the current Xiaohongshu page. You can click the links to view full posts.`;
-
-        console.log('🐛 DEBUG: Sending success response with summary');
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: summary,
-            sessionId
-          }
-        });
-      } else {
-        console.log('🐛 DEBUG: No posts found or invalid data');
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: '❌ No posts found on this page. Make sure you\'re on a Xiaohongshu search results or feed page.',
-            sessionId
-          }
-        });
-      }
-
-    } catch (error) {
-      console.error('🐛 DEBUG: Xiaohongshu extraction error:', error);
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `❌ Failed to extract posts: ${(error as Error).message}`,
-          sessionId
-        }
-      });
-    }
-  }
-
-  private async findXiaohongshuTab(): Promise<chrome.tabs.Tab | null> {
-    return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
-        if (chrome.runtime.lastError) {
-          console.error('Error querying tabs:', chrome.runtime.lastError);
-          resolve(null);
-          return;
-        }
-        
-        // Find the most recent Xiaohongshu tab
-        const xiaohongshuTabs = tabs.filter(tab => 
-          tab.url && tab.url.includes('xiaohongshu.com')
-        );
-        
-        if (xiaohongshuTabs.length > 0) {
-          // Return the most recently accessed tab
-          const mostRecent = xiaohongshuTabs.sort((a, b) => 
-            (b.lastAccessed || 0) - (a.lastAccessed || 0)
-          )[0];
-          resolve(mostRecent);
-        } else {
-          resolve(null);
-        }
-      });
-    });
   }
 
   private parseXiaohongshuSummaryCommand(text: string): string | null {

@@ -3,6 +3,7 @@ import { createChatSession, extractPageInfo, processCommand } from './utils';
 import { ChatUI } from './content/chat-ui';
 import { PageAnalyzer } from './content/page-analyzer';
 import { ActionExecutor } from './content/action-executor';
+import { ExtractorFactory } from './extractors';
 
 class ContentScript {
   private chatUI: ChatUI;
@@ -59,6 +60,10 @@ class ContentScript {
       switch (request.type) {
         case 'EXTRACT_PAGE_INFO':
           this.handleExtractPageInfo(sendResponse);
+          return true;
+
+        case 'EXTRACT_POSTS':
+          this.handleExtractPosts(request.payload, sendResponse);
           return true;
 
         case 'CLEAR_CHAT':
@@ -201,6 +206,54 @@ class ContentScript {
   private handleExtractPageInfo(sendResponse: (response: any) => void): void {
     const pageInfo = extractPageInfo();
     sendResponse(pageInfo);
+  }
+
+  private handleExtractPosts(payload: any, sendResponse: (response: any) => void): void {
+    try {
+      console.log('🔍 CONTENT: Starting post extraction with payload:', payload);
+      
+      // Get the appropriate extractor for this page
+      const extractor = ExtractorFactory.getExtractor();
+      
+      if (!extractor) {
+        console.log('🔍 CONTENT: No suitable extractor found for this page');
+        sendResponse({
+          success: false,
+          error: 'No suitable extractor found for this page. Currently only Xiaohongshu is supported.',
+          posts: [],
+          totalFound: 0,
+          pageUrl: window.location.href,
+          pageTitle: document.title,
+          platform: 'unknown'
+        });
+        return;
+      }
+      
+      console.log(`🔍 CONTENT: Using ${extractor.platform} extractor`);
+      
+      // Extract posts
+      const maxPosts = payload?.maxPosts || 5;
+      const result = extractor.extractPosts(maxPosts);
+      
+      console.log('🔍 CONTENT: Extraction completed:', result);
+      
+      sendResponse({
+        success: true,
+        ...result
+      });
+      
+    } catch (error) {
+      console.error('🔍 CONTENT: Extraction error:', error);
+      sendResponse({
+        success: false,
+        error: (error as Error).message,
+        posts: [],
+        totalFound: 0,
+        pageUrl: window.location.href,
+        pageTitle: document.title,
+        platform: 'unknown'
+      });
+    }
   }
 
   private handleClearChat(sendResponse: (response: any) => void): void {
