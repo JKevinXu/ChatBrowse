@@ -368,15 +368,73 @@ export class MessageRouter {
             }
           });
 
-          console.log('🐛 DEBUG: About to call handleXiaohongshuExtraction');
+          console.log('🐛 DEBUG: About to call extraction service');
 
           // Step 3: Extract the posts with error handling
-          await this.extractionService.extractXiaohongshuPosts(payload.tabId, (extractResponse) => {
-            console.log('🐛 DEBUG: Extract response received:', extractResponse);
+          const extractionResult = await this.extractionService.extractXiaohongshuPosts(payload.tabId, (extractResponse) => {
+            console.log('🐛 DEBUG: Extract progress response received:', extractResponse);
             sendFollowUpToPopup(extractResponse);
           }, payload.sessionId || 'default');
 
-          console.log('🐛 DEBUG: extractXiaohongshuPosts completed');
+          console.log('🐛 DEBUG: extractXiaohongshuPosts completed, result:', extractionResult);
+
+          // Step 4: Handle the extraction result
+          if (extractionResult?.success && extractionResult.posts && extractionResult.posts.length > 0) {
+            console.log('🐛 DEBUG: Extraction successful, sending to AI for summarization');
+            
+            // Send progress message
+            sendFollowUpToPopup({
+              type: 'MESSAGE',
+              payload: {
+                text: '🤖 Analyzing extracted content with AI to create intelligent summary...',
+                sessionId: payload.sessionId || 'default'
+              }
+            });
+
+            // Prepare content for AI summarization
+            const contentForAI = this.prepareContentForAI(extractionResult);
+            console.log('🐛 DEBUG: Prepared content for AI, length:', contentForAI.length);
+
+            // Call OpenAI service for summarization
+            await this.openaiService.handleChat({
+              text: contentForAI,
+              sessionId: payload.sessionId || 'default',
+              tabId: undefined
+            }, sender, (aiResponse) => {
+              console.log('🐛 DEBUG: Received AI summary response:', aiResponse);
+              
+              if (aiResponse && aiResponse.type === 'MESSAGE' && aiResponse.payload?.text) {
+                // Send the AI-generated summary
+                sendFollowUpToPopup({
+                  type: 'MESSAGE',
+                  payload: {
+                    text: `📊 **AI Summary of ${extractionResult.posts.length} Xiaohongshu Posts**\n\n${aiResponse.payload.text}`,
+                    sessionId: payload.sessionId || 'default'
+                  }
+                });
+              } else {
+                console.log('🐛 DEBUG: AI summarization failed, sending manual summary');
+                const manualSummary = this.createManualSummary(extractionResult);
+                sendFollowUpToPopup({
+                  type: 'MESSAGE',
+                  payload: {
+                    text: manualSummary,
+                    sessionId: payload.sessionId || 'default'
+                  }
+                });
+              }
+            });
+          } else {
+            console.log('🐛 DEBUG: Extraction failed or no posts found');
+            const errorMessage = extractionResult?.error || 'Failed to extract posts from Xiaohongshu';
+            sendFollowUpToPopup({
+              type: 'MESSAGE',
+              payload: {
+                text: `❌ ${errorMessage}`,
+                sessionId: payload.sessionId || 'default'
+              }
+            });
+          }
 
         } catch (extractError) {
           console.error('🐛 DEBUG: Analysis phase error:', extractError);
@@ -433,5 +491,58 @@ export class MessageRouter {
     
     console.log('🐛 DEBUG: No patterns matched, returning null');
     return null;
+  }
+
+  private prepareContentForAI(extractionResult: any): string {
+    console.log('🐛 DEBUG: Preparing content for AI summarization');
+    
+    let contentForAI = `Please analyze and summarize these ${extractionResult.posts.length} Xiaohongshu posts about the topic:\n\n`;
+    
+    extractionResult.posts.forEach((post: any, index: number) => {
+      contentForAI += `**Post ${index + 1}: ${post.title}**\n`;
+      contentForAI += `Content: ${post.content}\n`;
+      if (post.metadata?.author) {
+        contentForAI += `Author: ${post.metadata.author}\n`;
+      }
+      if (post.link) {
+        contentForAI += `Link: ${post.link}\n`;
+      }
+      contentForAI += `\n---\n\n`;
+    });
+    
+    contentForAI += `Please provide:\n`;
+    contentForAI += `1. A comprehensive summary of the main topics and themes\n`;
+    contentForAI += `2. Key insights and recommendations mentioned across the posts\n`;
+    contentForAI += `3. Common patterns or trends you notice\n`;
+    contentForAI += `4. Any notable differences in perspectives or approaches\n`;
+    contentForAI += `5. Practical takeaways for someone interested in this topic`;
+    
+    return contentForAI;
+  }
+
+  private createManualSummary(extractionResult: any): string {
+    console.log('🐛 DEBUG: Creating manual summary fallback');
+    
+    let summary = `📱 **Manual Summary of ${extractionResult.posts.length} Xiaohongshu Posts**\n\n`;
+    
+    // Extract key themes and topics
+    const allContent = extractionResult.posts.map((post: any) => post.content).join(' ');
+    const contentLength = allContent.length;
+    
+    summary += `📊 **Overview**: Analyzed ${extractionResult.posts.length} posts with ${contentLength} characters of content\n\n`;
+    
+    summary += `📋 **Posts Covered**:\n`;
+    extractionResult.posts.forEach((post: any, index: number) => {
+      summary += `${index + 1}. **${post.title}**\n`;
+      summary += `   → ${post.content.slice(0, 150)}${post.content.length > 150 ? '...' : ''}\n`;
+      if (post.metadata?.author) {
+        summary += `   → Author: ${post.metadata.author}\n`;
+      }
+      summary += `\n`;
+    });
+
+    summary += `💡 **Note**: This is a manual summary. AI summarization was not available.`;
+    
+    return summary;
   }
 } 

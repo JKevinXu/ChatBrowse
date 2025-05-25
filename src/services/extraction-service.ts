@@ -5,7 +5,7 @@ export class ExtractionService {
     tabId: number | undefined,
     sendResponse: (response: ChatResponse) => void,
     sessionId: string
-  ): Promise<void> {
+  ): Promise<any> { // Return the extraction result instead of handling summarization
     try {
       console.log('🐛 DEBUG: extractXiaohongshuPosts STARTED, extracting full content by default');
       
@@ -25,75 +25,94 @@ export class ExtractionService {
       
       if (!xiaohongshuTab) {
         console.log('🐛 DEBUG: No Xiaohongshu tab found');
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: '❌ No Xiaohongshu tab found. Please search for content on Xiaohongshu first.',
-            sessionId
-          }
-        });
-        return;
+        const errorResult = {
+          success: false,
+          error: 'No Xiaohongshu tab found. Please search for content on Xiaohongshu first.',
+          posts: [],
+          totalFound: 0,
+          pageUrl: '',
+          pageTitle: '',
+          platform: 'xiaohongshu'
+        };
+        return errorResult;
       }
 
       console.log('🐛 DEBUG: About to send EXTRACT_POSTS message to tab:', xiaohongshuTab.id);
       
-      // Use content script to extract posts with the proper extractor classes
-      chrome.tabs.sendMessage(
-        xiaohongshuTab.id!, 
-        { type: 'EXTRACT_POSTS', payload: { maxPosts: 5, fetchFullContent: true } }, // Always fetch full content
-        async (result) => {
-          console.log('🐛 DEBUG: Extract posts response:', result);
-          
-          if (chrome.runtime.lastError) {
-            console.error('🐛 DEBUG: Chrome runtime error:', chrome.runtime.lastError);
-            sendResponse({
-              type: 'MESSAGE',
-              payload: {
-                text: `❌ Failed to extract posts: ${chrome.runtime.lastError.message}`,
-                sessionId
-              }
-            });
-            return;
-          }
-          
-          if (result?.success && result.posts && result.posts.length > 0) {
-            console.log('🐛 DEBUG: Posts found, checking for full content extraction');
+      // Return a promise that resolves with extraction results
+      return new Promise((resolve) => {
+        // Use content script to extract posts with the proper extractor classes
+        chrome.tabs.sendMessage(
+          xiaohongshuTab.id!, 
+          { type: 'EXTRACT_POSTS', payload: { maxPosts: 5, fetchFullContent: true } }, // Always fetch full content
+          async (result) => {
+            console.log('🐛 DEBUG: Extract posts response:', result);
             
-            // Check if any posts need full content extraction
-            const needsFullContent = result.posts.some((post: any) => 
-              post.content.startsWith('[FETCH_FULL_CONTENT]')
-            );
-            
-            if (needsFullContent) {
-              console.log('🐛 DEBUG: Full content extraction needed, processing posts individually');
-              await this.extractFullContentForPosts(result.posts, sendResponse, sessionId);
-            } else {
-              console.log('🐛 DEBUG: Creating summary with preview content');
-              this.createAndSendSummary(result, sendResponse, sessionId);
+            if (chrome.runtime.lastError) {
+              console.error('🐛 DEBUG: Chrome runtime error:', chrome.runtime.lastError);
+              resolve({
+                success: false,
+                error: chrome.runtime.lastError.message,
+                posts: [],
+                totalFound: 0,
+                pageUrl: '',
+                pageTitle: '',
+                platform: 'xiaohongshu'
+              });
+              return;
             }
-          } else {
-            console.log('🐛 DEBUG: No posts found or extraction failed');
-            const errorMessage = result?.error || 'No posts found on this page or extraction failed';
-            sendResponse({
-              type: 'MESSAGE',
-              payload: {
-                text: `❌ ${errorMessage}`,
-                sessionId
+            
+            if (result?.success && result.posts && result.posts.length > 0) {
+              console.log('🐛 DEBUG: Posts found, processing for full content extraction');
+              
+              // Check if any posts need full content extraction
+              const needsFullContent = result.posts.some((post: any) => 
+                post.content.startsWith('[FETCH_FULL_CONTENT]')
+              );
+              
+              if (needsFullContent) {
+                console.log('🐛 DEBUG: Full content extraction needed, processing posts individually');
+                const extractionResult = await this.extractFullContentForPosts(result.posts);
+                resolve({
+                  success: true,
+                  posts: extractionResult,
+                  totalFound: result.totalFound,
+                  pageUrl: result.pageUrl,
+                  pageTitle: result.pageTitle,
+                  platform: result.platform
+                });
+              } else {
+                console.log('🐛 DEBUG: Returning posts with preview content');
+                resolve(result);
               }
-            });
+            } else {
+              console.log('🐛 DEBUG: No posts found or extraction failed');
+              const errorMessage = result?.error || 'No posts found on this page or extraction failed';
+              resolve({
+                success: false,
+                error: errorMessage,
+                posts: [],
+                totalFound: 0,
+                pageUrl: result?.pageUrl || '',
+                pageTitle: result?.pageTitle || '',
+                platform: 'xiaohongshu'
+              });
+            }
           }
-        }
-      );
+        );
+      });
 
     } catch (error) {
-      console.error('🐛 DEBUG: Xiaohongshu extraction error:', error);
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `❌ Failed to extract posts: ${(error as Error).message}`,
-          sessionId
-        }
-      });
+      console.error('�� DEBUG: Xiaohongshu extraction error:', error);
+      return {
+        success: false,
+        error: (error as Error).message,
+        posts: [],
+        totalFound: 0,
+        pageUrl: '',
+        pageTitle: '',
+        platform: 'xiaohongshu'
+      };
     }
   }
 
@@ -146,10 +165,8 @@ export class ExtractionService {
   }
 
   private async extractFullContentForPosts(
-    posts: any[],
-    sendResponse: (response: ChatResponse) => void,
-    sessionId: string
-  ): Promise<void> {
+    posts: any[]
+  ): Promise<any[]> {
     console.log('🐛 DEBUG: Starting full content extraction for', posts.length, 'posts');
     
     const updatedPosts = [];
@@ -180,13 +197,7 @@ export class ExtractionService {
       }
     }
     
-    // Create and send summary with full content
-    this.createAndSendSummary({
-      posts: updatedPosts,
-      totalFound: posts.length,
-      pageTitle: 'Xiaohongshu Search Results',
-      platform: 'xiaohongshu'
-    }, sendResponse, sessionId);
+    return updatedPosts;
   }
 
   private async fetchFullContentFromUrl(postUrl: string): Promise<string> {
@@ -277,49 +288,6 @@ export class ExtractionService {
           resolve('[Timeout waiting for post to load]');
         }, 10000); // 10 second timeout
       });
-    });
-  }
-
-  private createAndSendSummary(
-    result: any,
-    sendResponse: (response: ChatResponse) => void,
-    sessionId: string
-  ): void {
-    console.log('🐛 DEBUG: Creating summary for', result.posts.length, 'posts');
-    
-    let summary = `📱 **${result.platform.charAt(0).toUpperCase() + result.platform.slice(1)} Posts Extracted (Full Content)**\n\n`;
-    summary += `🔍 **Page**: ${result.pageTitle}\n`;
-    summary += `📊 **Found**: ${result.totalFound} total posts, extracted top ${result.posts.length}\n\n`;
-    summary += `📋 **Top Posts**:\n\n`;
-
-    result.posts.forEach((post: any, index: number) => {
-      summary += `**${index + 1}. ${post.title}**\n`;
-      
-      // Show more content for full extraction
-      const content = post.content.slice(0, 500);
-      summary += `${content}${post.content.length > 500 ? '...' : ''}\n`;
-      
-      if (post.link) {
-        summary += `🔗 Link: ${post.link}\n`;
-      }
-      if (post.metadata?.author) {
-        summary += `👤 Author: ${post.metadata.author}\n`;
-      }
-      if (post.metadata?.viewCount) {
-        summary += `👀 Views: ${post.metadata.viewCount}\n`;
-      }
-      summary += `\n`;
-    });
-
-    summary += `💡 **Usage**: These posts were extracted with full content from individual Xiaohongshu pages.`;
-
-    console.log('🐛 DEBUG: Sending summary response');
-    sendResponse({
-      type: 'MESSAGE',
-      payload: {
-        text: summary,
-        sessionId
-      }
     });
   }
 } 
