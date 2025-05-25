@@ -279,8 +279,75 @@ export class ChatUI {
     
     messagesContainer.appendChild(messageElement);
     
+    // Add hover functionality for post reference links
+    this.setupPostReferenceHovers(messageElement);
+    
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  private setupPostReferenceHovers(messageElement: HTMLElement): void {
+    const postLinks = messageElement.querySelectorAll('a.post-reference');
+    
+    postLinks.forEach(link => {
+      const linkElement = link as HTMLElement;
+      
+      linkElement.addEventListener('mouseenter', (e) => {
+        this.showPostPreview(e.target as HTMLElement);
+      });
+      
+      linkElement.addEventListener('mouseleave', () => {
+        this.hidePostPreview();
+      });
+    });
+  }
+
+  private showPostPreview(linkElement: HTMLElement): void {
+    // Remove any existing tooltip
+    this.hidePostPreview();
+    
+    const preview = linkElement.dataset.preview;
+    const author = linkElement.dataset.author;
+    const title = linkElement.dataset.title;
+    
+    if (!preview) return;
+    
+    // Create tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'chatbrowse-post-tooltip';
+    tooltip.innerHTML = `
+      <div class="tooltip-header">
+        <strong>${title}</strong>
+        ${author ? `<span class="tooltip-author">by ${author}</span>` : ''}
+      </div>
+      <div class="tooltip-content">${preview}${preview.length >= 200 ? '...' : ''}</div>
+    `;
+    
+    // Position tooltip
+    const rect = linkElement.getBoundingClientRect();
+    tooltip.style.position = 'fixed';
+    tooltip.style.left = `${rect.left}px`;
+    tooltip.style.top = `${rect.bottom + 5}px`;
+    tooltip.style.zIndex = '10000';
+    
+    // Add to document
+    document.body.appendChild(tooltip);
+    
+    // Adjust position if tooltip goes off screen
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (tooltipRect.right > window.innerWidth) {
+      tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+    }
+    if (tooltipRect.bottom > window.innerHeight) {
+      tooltip.style.top = `${rect.top - tooltipRect.height - 5}px`;
+    }
+  }
+
+  private hidePostPreview(): void {
+    const existingTooltip = document.querySelector('.chatbrowse-post-tooltip');
+    if (existingTooltip) {
+      existingTooltip.remove();
+    }
   }
 
   toggleChat(): void {
@@ -303,6 +370,9 @@ export class ChatUI {
     if (messagesContainer) {
       messagesContainer.innerHTML = '';
       
+      // Clean up any lingering tooltips
+      this.hidePostPreview();
+      
       // Add a fresh welcome message
       if (this.isXiaohongshuPage) {
         this.addWelcomeMessage();
@@ -313,6 +383,9 @@ export class ChatUI {
   updateSession(session: ChatSession): void {
     this.currentSession = session;
     this.renderMessages();
+    
+    // Clean up any lingering tooltips when updating session
+    this.hidePostPreview();
   }
 
   private renderMessages(): void {

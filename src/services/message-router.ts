@@ -517,15 +517,18 @@ export class MessageRouter {
     contentForAI += `4. **不同观点**: 不同的视角或方法的显著差异\n`;
     contentForAI += `5. **实用建议**: 对于对这个话题感兴趣的人的实用建议\n\n`;
     
-    contentForAI += `**重要**: 请在总结最后添加"参考帖子"部分，列出所有帖子的标题和链接，格式如下：\n`;
+    contentForAI += `**重要**: 请在总结最后添加"参考帖子"部分，使用特殊的链接格式以支持悬停预览：\n`;
     contentForAI += `## 📚 参考帖子\n`;
     const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
     if (postsWithLinks.length > 0) {
       postsWithLinks.forEach((post: any, index: number) => {
-        contentForAI += `${index + 1}. [${post.title}](${post.link})\n`;
+        // Create a safe content preview for hover (first 200 chars)
+        const previewContent = post.content.slice(0, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
+        const authorInfo = post.metadata?.author ? ` - ${post.metadata.author}` : '';
+        contentForAI += `${index + 1}. <a href="${post.link}" class="post-reference" data-preview="${previewContent}" data-author="${post.metadata?.author || ''}" data-title="${post.title}">${post.title}</a>${authorInfo}\n`;
       });
     }
-    contentForAI += `\n请用清晰的中文回答，使用合适的标题和格式。确保包含参考帖子链接。`;
+    contentForAI += `\n请使用上述精确的HTML链接格式（包含data-preview等属性），用清晰的中文回答，使用合适的标题和格式。确保包含参考帖子链接。`;
     
     return contentForAI;
   }
@@ -556,7 +559,10 @@ export class MessageRouter {
     const postsWithLinks = extractionResult.posts.filter((post: any) => post.link);
     if (postsWithLinks.length > 0) {
       postsWithLinks.forEach((post: any, index: number) => {
-        summary += `${index + 1}. [${post.title}](${post.link})\n`;
+        // Create hover-enabled links with post content preview
+        const previewContent = post.content.slice(0, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
+        const authorInfo = post.metadata?.author ? post.metadata.author : '';
+        summary += `${index + 1}. <a href="${post.link}" class="post-reference" data-preview="${previewContent}" data-author="${authorInfo}" data-title="${post.title}">${post.title}</a>\n`;
         if (post.metadata?.author) {
           summary += `   *作者: ${post.metadata.author}*\n`;
         }

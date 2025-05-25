@@ -245,4 +245,77 @@
 .chatbrowse-message.user blockquote {
   border-left-color: rgba(255, 255, 255, 0.3);
   color: rgba(255, 255, 255, 0.8);
+}
+
+/* Post Reference Hover Tooltips */
+.chatbrowse-post-tooltip {
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 350px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  z-index: 10000;
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+.chatbrowse-post-tooltip .tooltip-header {
+  padding: 8px 12px;
+  background: #f6f8fa;
+  border-bottom: 1px solid #e1e4e8;
+  border-radius: 7px 7px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chatbrowse-post-tooltip .tooltip-header strong {
+  color: #24292e;
+  font-weight: 600;
+  margin-right: 8px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatbrowse-post-tooltip .tooltip-author {
+  color: #586069;
+  font-size: 11px;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.chatbrowse-post-tooltip .tooltip-content {
+  padding: 10px 12px;
+  color: #24292e;
+  background: #ffffff;
+  border-radius: 0 0 7px 7px;
+}
+
+/* Post reference links styling */
+a.post-reference {
+  color: #0366d6 !important;
+  text-decoration: none !important;
+  border-bottom: 1px dotted #0366d6 !important;
+  transition: all 0.2s ease !important;
+}
+
+a.post-reference:hover {
+  color: #0553c1 !important;
+  border-bottom-style: solid !important;
+  background-color: rgba(3, 102, 214, 0.1) !important;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 } 

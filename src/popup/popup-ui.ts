@@ -111,8 +111,80 @@ export class PopupUI {
     
     this.chatMessages.appendChild(messageElement);
     
+    // Add hover functionality for post reference links
+    this.setupPostReferenceHovers(messageElement);
+    
     // Scroll to the bottom
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+  }
+
+  private setupPostReferenceHovers(messageElement: HTMLElement): void {
+    const postLinks = messageElement.querySelectorAll('a.post-reference');
+    
+    postLinks.forEach(link => {
+      const linkElement = link as HTMLElement;
+      
+      linkElement.addEventListener('mouseenter', (e) => {
+        this.showPostPreview(e.target as HTMLElement);
+      });
+      
+      linkElement.addEventListener('mouseleave', () => {
+        this.hidePostPreview();
+      });
+    });
+  }
+
+  private showPostPreview(linkElement: HTMLElement): void {
+    // Remove any existing tooltip
+    this.hidePostPreview();
+    
+    const preview = linkElement.dataset.preview;
+    const author = linkElement.dataset.author;
+    const title = linkElement.dataset.title;
+    
+    if (!preview) return;
+    
+    // Create tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'popup-post-tooltip';
+    tooltip.innerHTML = `
+      <div class="tooltip-header">
+        <strong>${title}</strong>
+        ${author ? `<span class="tooltip-author">by ${author}</span>` : ''}
+      </div>
+      <div class="tooltip-content">${preview}${preview.length >= 200 ? '...' : ''}</div>
+    `;
+    
+    // Position tooltip relative to popup
+    const rect = linkElement.getBoundingClientRect();
+    const popupRect = document.body.getBoundingClientRect();
+    
+    tooltip.style.position = 'absolute';
+    tooltip.style.left = `${rect.left - popupRect.left}px`;
+    tooltip.style.top = `${rect.bottom - popupRect.top + 5}px`;
+    tooltip.style.zIndex = '1000';
+    
+    // Add to popup body
+    document.body.appendChild(tooltip);
+    
+    // Adjust position if tooltip goes off screen within popup bounds
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const popupWidth = document.body.offsetWidth;
+    const popupHeight = document.body.offsetHeight;
+    
+    if (tooltipRect.right > popupWidth) {
+      tooltip.style.left = `${popupWidth - tooltipRect.width - 10}px`;
+    }
+    if (tooltipRect.bottom > popupHeight) {
+      tooltip.style.top = `${rect.top - popupRect.top - tooltipRect.height - 5}px`;
+    }
+  }
+
+  private hidePostPreview(): void {
+    const existingTooltip = document.querySelector('.popup-post-tooltip');
+    if (existingTooltip) {
+      existingTooltip.remove();
+    }
   }
 
   clearChat(): void {
@@ -122,6 +194,9 @@ export class PopupUI {
           Welcome to ChatBrowse! How can I help you navigate this website?
         </div>
       `;
+      
+      // Clean up any lingering tooltips
+      this.hidePostPreview();
     }
   }
 

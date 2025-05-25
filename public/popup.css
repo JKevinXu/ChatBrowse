@@ -242,4 +242,79 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Post Reference Hover Tooltips */
+.popup-post-tooltip {
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 1000;
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+.popup-post-tooltip .tooltip-header {
+  padding: 6px 10px;
+  background: #f6f8fa;
+  border-bottom: 1px solid #e1e4e8;
+  border-radius: 7px 7px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popup-post-tooltip .tooltip-header strong {
+  color: #24292e;
+  font-weight: 600;
+  margin-right: 6px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.popup-post-tooltip .tooltip-author {
+  color: #586069;
+  font-size: 10px;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.popup-post-tooltip .tooltip-content {
+  padding: 8px 10px;
+  color: #24292e;
+  background: #ffffff;
+  border-radius: 0 0 7px 7px;
+  font-size: 11px;
+}
+
+/* Post reference links styling for popup */
+.message a.post-reference {
+  color: #0366d6 !important;
+  text-decoration: none !important;
+  border-bottom: 1px dotted #0366d6 !important;
+  transition: all 0.2s ease !important;
+}
+
+.message a.post-reference:hover {
+  color: #0553c1 !important;
+  border-bottom-style: solid !important;
+  background-color: rgba(3, 102, 214, 0.1) !important;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 } 
