@@ -233,7 +233,10 @@ class ContentScript {
       
       // Extract posts
       const maxPosts = payload?.maxPosts || 5;
-      const result = extractor.extractPosts(maxPosts);
+      const fetchFullContent = payload?.fetchFullContent || false;
+      console.log('🔍 CONTENT: Extraction options - maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
+      
+      const result = extractor.extractPosts(maxPosts, fetchFullContent);
       
       console.log('🔍 CONTENT: Extraction completed:', result);
       

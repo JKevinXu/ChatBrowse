@@ -26,9 +26,10 @@ export interface PlatformExtractor {
   /**
    * Extract posts from the current page
    * @param maxPosts Maximum number of posts to extract
+   * @param fetchFullContent Whether to fetch full content from individual post links
    * @returns Extraction result with posts and metadata
    */
-  extractPosts(maxPosts: number): ExtractionResult;
+  extractPosts(maxPosts: number, fetchFullContent?: boolean): ExtractionResult;
   
   /**
    * Check if this extractor can handle the current page
@@ -40,7 +41,7 @@ export interface PlatformExtractor {
 export abstract class BaseExtractor implements PlatformExtractor {
   abstract platform: string;
   abstract canHandle(): boolean;
-  abstract extractPosts(maxPosts: number): ExtractionResult;
+  abstract extractPosts(maxPosts: number, fetchFullContent?: boolean): ExtractionResult;
   
   protected logDebug(message: string, ...args: any[]): void {
     console.log(`🐛 ${this.platform.toUpperCase()} EXTRACTOR:`, message, ...args);

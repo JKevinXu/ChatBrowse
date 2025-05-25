@@ -7,13 +7,14 @@ export class XiaohongshuExtractor extends BaseExtractor {
     return window.location.hostname.includes('xiaohongshu.com');
   }
 
-  extractPosts(maxPosts: number = 5): ExtractionResult {
-    this.logDebug('Starting post extraction, maxPosts:', maxPosts);
+  extractPosts(maxPosts: number = 5, fetchFullContent: boolean = false): ExtractionResult {
+    this.logDebug('Starting post extraction, maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
     
     const posts: ExtractedPost[] = [];
     
     // Try different selectors to find posts
     const postSelectors = [
+      'section[class*="note-item"]', // Based on user's HTML
       'section[class*="note"]',
       'article[class*="note"]', 
       'div[class*="note-item"]',
@@ -54,7 +55,7 @@ export class XiaohongshuExtractor extends BaseExtractor {
     postElements.slice(0, maxPosts).forEach((post, index) => {
       this.logDebug('Processing post', index + 1);
       
-      const extractedPost = this.extractSinglePost(post, index + 1);
+      const extractedPost = this.extractSinglePost(post, index + 1, fetchFullContent);
       if (extractedPost) {
         posts.push(extractedPost);
         this.logDebug('Post', index + 1, 'added to results');
@@ -75,20 +76,23 @@ export class XiaohongshuExtractor extends BaseExtractor {
     return result;
   }
 
-  private extractSinglePost(post: Element, index: number): ExtractedPost | null {
+  private extractSinglePost(post: Element, index: number, fetchFullContent: boolean = false): ExtractedPost | null {
     // Extract title
     const title = this.extractTitle(post, index);
     
-    // Extract content
-    const content = this.extractContent(post);
+    // Extract link (enhanced to get proper post URLs)
+    const link = this.extractPostLink(post);
     
-    // Extract link
-    const link = this.extractLink(post);
+    // Extract content (preview or full based on flag)
+    const content = fetchFullContent ? 
+      this.extractFullContentFromLink(link) : 
+      this.extractPreviewContent(post);
     
     // Extract metadata
     const metadata = this.extractMetadata(post);
     
     this.logDebug('Post', index, 'title:', title.slice(0, 50));
+    this.logDebug('Post', index, 'link:', link);
     this.logDebug('Post', index, 'content length:', content.length);
     this.logDebug('Post', index, 'content preview:', content.slice(0, 100));
     
@@ -97,12 +101,180 @@ export class XiaohongshuExtractor extends BaseExtractor {
         index,
         title: title.slice(0, 200),
         content,
-        link,
+        link: this.makeAbsoluteUrl(link),
         metadata
       };
     }
     
     return null;
+  }
+
+  private extractPostLink(post: Element): string {
+    // Enhanced link extraction based on user's HTML structure
+    const linkSelectors = [
+      'a.cover[href*="/search_result/"]', // Search result links
+      'a[href*="/explore/"]', // Explore links
+      'a.title[href]', // Title links
+      'a[href*="/notes/"]', // Notes links
+      'a[href]' // Any link as fallback
+    ];
+    
+    for (const selector of linkSelectors) {
+      const linkElement = post.querySelector(selector) as HTMLAnchorElement;
+      if (linkElement?.href) {
+        this.logDebug('Found link with selector:', selector, 'URL:', linkElement.href);
+        return linkElement.href;
+      }
+    }
+    
+    // Try to find href attribute in any element
+    const anyElementWithHref = post.querySelector('[href]') as HTMLElement;
+    if (anyElementWithHref?.getAttribute('href')) {
+      return anyElementWithHref.getAttribute('href') || '';
+    }
+    
+    return '';
+  }
+
+  private extractFullContentFromLink(postUrl: string): string {
+    // For content script context, we can't directly fetch other pages
+    // This will be handled by the background script opening individual post tabs
+    this.logDebug('Full content extraction requested for:', postUrl);
+    return '[FETCH_FULL_CONTENT]' + postUrl; // Special marker for background script
+  }
+
+  // Method to extract full content when already on a post detail page
+  extractFullPostContent(): string {
+    this.logDebug('Extracting full content from post detail page');
+    
+    // Selectors for full post content on detail pages
+    const fullContentSelectors = [
+      '#detail-desc .note-text', // Main content area
+      '.note-text', // Alternative content area
+      '.content', // Generic content
+      '[class*="content"]', // Any element with "content" in class
+      '.desc', // Description area
+      'main', // Main content area
+      'article' // Article content
+    ];
+    
+    let fullContent = '';
+    
+    for (const selector of fullContentSelectors) {
+      const contentElement = document.querySelector(selector);
+      if (contentElement) {
+        // Get all text content, handling spans and nested elements
+        const textContent = this.extractTextFromElement(contentElement);
+        if (textContent && textContent.length > fullContent.length) {
+          fullContent = textContent;
+          this.logDebug('Found longer content with selector:', selector, 'length:', textContent.length);
+        }
+      }
+    }
+    
+    // Clean and format the content
+    if (fullContent) {
+      fullContent = this.cleanText(fullContent);
+      fullContent = this.removeUINoise(fullContent);
+      // Remove common UI text that might appear in posts
+      fullContent = fullContent.replace(/^(点赞|收藏|评论|分享|关注|取消关注)\s*/g, '');
+      fullContent = fullContent.replace(/\s*(点赞|收藏|评论|分享|关注|取消关注)\s*$/g, '');
+    }
+    
+    return fullContent || '[No content found on this page]';
+  }
+  
+  private extractTextFromElement(element: Element): string {
+    // Extract text while preserving structure and handling nested elements
+    const textNodes: string[] = [];
+    
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          const parent = node.parentElement;
+          // Skip text in script, style, or hidden elements
+          if (parent && (
+            parent.tagName === 'SCRIPT' || 
+            parent.tagName === 'STYLE' ||
+            parent.style.display === 'none' ||
+            parent.style.visibility === 'hidden'
+          )) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+    
+    let textNode;
+    while (textNode = walker.nextNode()) {
+      const text = textNode.textContent?.trim();
+      if (text && text.length > 3) {
+        textNodes.push(text);
+      }
+    }
+    
+    return textNodes.join(' ').trim();
+  }
+
+  private extractPreviewContent(post: Element): string {
+    // This is the existing preview content extraction logic
+    let content = '';
+    
+    // Method 1: Try specific Xiaohongshu content selectors
+    const xiaohongshuSelectors = [
+      '.title span', // Based on user's HTML: <span>Python学不会的就疯狂去蹭这几位老师的课！</span>
+      '#detail-desc .note-text span',
+      '.desc .note-text span', 
+      '.note-text span',
+      '#detail-desc .note-text',
+      '.desc .note-text',
+      '.note-text',
+      '#detail-desc',
+      '.desc'
+    ];
+    
+    for (const selector of xiaohongshuSelectors) {
+      const contentElement = post.querySelector(selector);
+      if (contentElement) {
+        content = this.extractFromContentElement(contentElement, selector);
+        this.logDebug('Found content with selector:', selector, 'length:', content.length);
+        if (content.length > 20) { // Lower threshold for preview
+          break;
+        }
+      }
+    }
+    
+    // Method 2: Search result page extraction
+    if (content.length < 50) {
+      content = this.extractFromSearchResults(post);
+    }
+    
+    // Method 3: Aggressive extraction as fallback
+    if (content.length < 20) {
+      content = this.extractAggressively(post);
+    }
+    
+    // Clean up the content
+    if (content) {
+      content = this.cleanText(content);
+      content = this.removeUINoise(content);
+      content = content.replace(/\s+\d+$/, ''); // Remove trailing numbers
+      content = content.slice(0, 800); // Limit length
+    }
+    
+    return content;
+  }
+
+  private makeAbsoluteUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('/')) {
+      return 'https://www.xiaohongshu.com' + url;
+    }
+    return url;
   }
 
   private extractTitle(post: Element, index: number): string {
@@ -128,53 +300,6 @@ export class XiaohongshuExtractor extends BaseExtractor {
     }
     
     return `Post ${index}`;
-  }
-
-  private extractContent(post: Element): string {
-    let content = '';
-    
-    // Method 1: Try specific Xiaohongshu content selectors
-    const xiaohongshuSelectors = [
-      '#detail-desc .note-text span',
-      '.desc .note-text span', 
-      '.note-text span',
-      '#detail-desc .note-text',
-      '.desc .note-text',
-      '.note-text',
-      '#detail-desc',
-      '.desc'
-    ];
-    
-    for (const selector of xiaohongshuSelectors) {
-      const contentElement = post.querySelector(selector);
-      if (contentElement) {
-        content = this.extractFromContentElement(contentElement, selector);
-        this.logDebug('Found content with selector:', selector, 'length:', content.length);
-        if (content.length > 100) {
-          break;
-        }
-      }
-    }
-    
-    // Method 2: Search result page extraction
-    if (content.length < 100) {
-      content = this.extractFromSearchResults(post);
-    }
-    
-    // Method 3: Aggressive extraction as fallback
-    if (content.length < 50) {
-      content = this.extractAggressively(post);
-    }
-    
-    // Clean up the content
-    if (content) {
-      content = this.cleanText(content);
-      content = this.removeUINoise(content);
-      content = content.replace(/\s+\d+$/, ''); // Remove trailing numbers
-      content = content.slice(0, 800); // Limit length
-    }
-    
-    return content;
   }
 
   private extractFromContentElement(contentElement: Element, selector: string): string {
@@ -297,11 +422,6 @@ export class XiaohongshuExtractor extends BaseExtractor {
     });
     
     return meaningfulTexts.join(' ');
-  }
-
-  private extractLink(post: Element): string {
-    const linkElement = post.querySelector('a[href]');
-    return linkElement?.getAttribute('href') || '';
   }
 
   private extractMetadata(post: Element): any {
