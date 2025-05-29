@@ -9,42 +9,100 @@ class PopupApp {
   private messageHandler: MessageHandler;
 
   constructor() {
+    console.log('🔧 PopupApp: Constructor starting...');
     this.sessionManager = new SessionManager();
     this.ui = new PopupUI((text) => this.handleUserMessage(text));
     this.messageHandler = new MessageHandler((message) => this.handleIncomingMessage(message));
+    console.log('🔧 PopupApp: Constructor completed');
   }
 
   async initialize(): Promise<void> {
-    this.ui.initialize();
-
+    console.log('🚀 PopupApp: Initialize starting...');
+    
     try {
+      console.log('🔧 PopupApp: Initializing UI...');
+      this.ui.initialize();
+      console.log('✅ PopupApp: UI initialized successfully');
+
+      console.log('🔧 PopupApp: Getting current tab...');
       // Get current tab and load session
       const tabs = await this.sessionManager.getCurrentTab();
+      console.log('🔧 PopupApp: Tabs received:', tabs);
+      
       if (tabs && tabs.length > 0) {
         const currentTab = tabs[0];
         const tabUrl = currentTab.url || '';
         const tabTitle = currentTab.title || 'Untitled Page';
         
+        console.log('🔧 PopupApp: Current tab info:', { url: tabUrl, title: tabTitle, id: currentTab.id });
+        
+        console.log('🔧 PopupApp: Loading or creating session...');
         const session = await this.sessionManager.loadOrCreateSession(tabUrl, tabTitle);
-        this.ui.renderMessages(session.messages);
+        console.log('✅ PopupApp: Session loaded/created:', { id: session.id, messagesCount: session.messages.length });
+        
+        console.log('🔧 PopupApp: Rendering messages...');
+        this.renderMessages(session.messages);
+        console.log('✅ PopupApp: Messages rendered successfully');
       } else {
+        console.log('⚠️ PopupApp: No active tabs found, using fallback session');
         // Fallback session
         const fallbackSession = await this.sessionManager.loadOrCreateSession('', 'ChatBrowse');
-        this.ui.renderMessages(fallbackSession.messages);
+        console.log('✅ PopupApp: Fallback session created:', { id: fallbackSession.id, messagesCount: fallbackSession.messages.length });
+        this.renderMessages(fallbackSession.messages);
       }
     } catch (error) {
-      console.error('Error initializing popup:', error);
+      console.error('❌ PopupApp: Error during initialization:', error);
+      console.error('❌ PopupApp: Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
       // Show error message in UI
       const errorMessage = createMessage('Error loading session. Please try again.', 'system');
       this.ui.addMessageToChat(errorMessage);
     }
 
-    this.ui.focusInput();
+    console.log('🔧 PopupApp: Focusing input...');
+    this.focusInput();
+    console.log('✅ PopupApp: Initialize completed');
+  }
+
+  private renderMessages(messages: any[]): void {
+    console.log('🔧 PopupApp: Rendering', messages.length, 'messages');
+    
+    // Clear existing messages first
+    this.ui.clearChat();
+    console.log('🔧 PopupApp: Chat cleared');
+    
+    // Add each message to the chat
+    messages.forEach((message, index) => {
+      console.log(`🔧 PopupApp: Adding message ${index + 1}/${messages.length}:`, {
+        id: message.id,
+        sender: message.sender,
+        text: message.text.substring(0, 100) + (message.text.length > 100 ? '...' : ''),
+        timestamp: message.timestamp
+      });
+      this.ui.addMessageToChat(message);
+    });
+    
+    console.log('✅ PopupApp: All messages rendered successfully');
+  }
+
+  private focusInput(): void {
+    console.log('🔧 PopupApp: Attempting to focus input');
+    const userInput = document.getElementById('userInput') as HTMLInputElement;
+    if (userInput) {
+      userInput.focus();
+      console.log('✅ PopupApp: Input focused successfully');
+    } else {
+      console.error('❌ PopupApp: Could not find userInput element');
+    }
   }
 
   private async handleUserMessage(text: string): Promise<void> {
+    console.log('💬 PopupApp: Handling user message:', text);
     const session = this.sessionManager.getCurrentSession();
-    if (!session) return;
+    if (!session) {
+      console.error('❌ PopupApp: No current session available');
+      return;
+    }
 
     // Add user message to UI and session
     const userMessage = createMessage(text, 'user');
@@ -53,19 +111,22 @@ class PopupApp {
 
     // Send to background for processing
     try {
+      console.log('🔧 PopupApp: Sending message to background...');
       const systemMessage = await this.messageHandler.sendMessage(text, session.id);
       if (systemMessage) {
+        console.log('✅ PopupApp: Received system message');
         this.ui.addMessageToChat(systemMessage);
         await this.sessionManager.addMessageToSession(systemMessage);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ PopupApp: Error sending message:', error);
       const errorMessage = createMessage('Error sending message. Please try again.', 'system');
       this.ui.addMessageToChat(errorMessage);
     }
   }
 
   private async handleIncomingMessage(message: any): Promise<void> {
+    console.log('📨 PopupApp: Handling incoming message:', message);
     this.ui.addMessageToChat(message);
     await this.sessionManager.addMessageToSession(message);
   }
@@ -73,6 +134,7 @@ class PopupApp {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🌟 PopupApp: DOM loaded, starting app initialization...');
   const app = new PopupApp();
   await app.initialize();
 }); 

@@ -51,9 +51,12 @@ export class ChatUI {
   }
 
   private createChatInterface(): void {
+    console.log('🔧 ContentScript ChatUI: createChatInterface called');
+    
     // Create container
     this.chatContainer = document.createElement('div');
     this.chatContainer.className = 'chatbrowse-container';
+    console.log('🔧 ContentScript ChatUI: Created chat container');
     
     // Create toggle button with dynamic content
     const toggleButton = document.createElement('div');
@@ -62,15 +65,18 @@ export class ChatUI {
       toggleButton.classList.add('active'); // Add pulse animation
       toggleButton.innerHTML = '<span class="chatbrowse-icon">🔥</span>';
       toggleButton.title = 'ChatBrowse - Ready to analyze Xiaohongshu!';
+      console.log('🔧 ContentScript ChatUI: Created Xiaohongshu toggle button');
     } else {
       toggleButton.innerHTML = '<span class="chatbrowse-icon">💬</span>';
       toggleButton.title = 'ChatBrowse - Your AI browsing assistant';
+      console.log('🔧 ContentScript ChatUI: Created general toggle button');
     }
     toggleButton.addEventListener('click', () => this.toggleChat());
     
     // Create chat panel
     const chatPanel = document.createElement('div');
     chatPanel.className = 'chatbrowse-chat';
+    console.log('🔧 ContentScript ChatUI: Created chat panel (hidden by default)');
     
     // Create header with dynamic title
     const header = document.createElement('div');
@@ -97,6 +103,7 @@ export class ChatUI {
       <input type="text" placeholder="${placeholder}">
       <button>Send</button>
     `;
+    console.log('🔧 ContentScript ChatUI: Created input area with placeholder:', placeholder);
     
     // Assemble the chat panel
     chatPanel.appendChild(header);
@@ -109,6 +116,8 @@ export class ChatUI {
     
     // Add to the document
     document.body.appendChild(this.chatContainer);
+    console.log('🔧 ContentScript ChatUI: Chat interface added to document body');
+    console.log('🔧 ContentScript ChatUI: Toggle button visible, chat panel hidden by default');
   }
 
   private setupEventListeners(): void {
@@ -475,9 +484,12 @@ export class ChatUI {
   }
 
   toggleChat(): void {
+    console.log('🔧 ContentScript ChatUI: toggleChat called');
     const chatPanel = this.chatContainer?.querySelector('.chatbrowse-chat');
     if (chatPanel) {
+      const wasActive = chatPanel.classList.contains('active');
       chatPanel.classList.toggle('active');
+      console.log('🔧 ContentScript ChatUI: Chat panel toggled from', wasActive ? 'active' : 'inactive', 'to', !wasActive ? 'active' : 'inactive');
       
       // If opening chat on Xiaohongshu, show helpful tips
       if (chatPanel.classList.contains('active') && this.isXiaohongshuPage) {
@@ -487,6 +499,24 @@ export class ChatUI {
         }
       }
     }
+  }
+
+  // Method to hide the chat interface (useful when popup is open)
+  hideChat(): void {
+    console.log('🔧 ContentScript ChatUI: hideChat called');
+    const chatPanel = this.chatContainer?.querySelector('.chatbrowse-chat');
+    if (chatPanel) {
+      chatPanel.classList.remove('active');
+      console.log('🔧 ContentScript ChatUI: Chat panel hidden');
+    }
+  }
+
+  // Method to check if chat is currently visible
+  isChatVisible(): boolean {
+    const chatPanel = this.chatContainer?.querySelector('.chatbrowse-chat');
+    const isVisible = chatPanel?.classList.contains('active') || false;
+    console.log('🔧 ContentScript ChatUI: isChatVisible =', isVisible);
+    return isVisible;
   }
 
   clearChat(): void {

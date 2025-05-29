@@ -49,19 +49,21 @@ export class PopupUI {
   }
 
   private handleSendMessage(): void {
+    console.log('🔧 PopupUI: handleSendMessage called');
     if (!this.userInput) return;
     
     const text = this.userInput.value.trim();
     if (!text) return;
     
+    console.log('🔧 PopupUI: User input text:', text);
+    
     // Clear input
     this.userInput.value = '';
+    console.log('🔧 PopupUI: Input cleared');
     
-    // Add user message to chat
-    this.addMessageToChat(createMessage(text, 'user'));
-    
-    // Notify parent
+    // Notify parent (PopupApp will handle adding the message to chat)
     if (this.onMessageSend) {
+      console.log('🔧 PopupUI: Calling onMessageSend callback');
       this.onMessageSend(text);
     }
   }
@@ -90,7 +92,17 @@ export class PopupUI {
   }
 
   addMessageToChat(message: Message): void {
-    if (!this.chatMessages) return;
+    console.log('🔧 PopupUI: addMessageToChat called with:', {
+      id: message.id,
+      sender: message.sender,
+      text: message.text.substring(0, 50) + (message.text.length > 50 ? '...' : ''),
+      timestamp: message.timestamp
+    });
+    
+    if (!this.chatMessages) {
+      console.error('❌ PopupUI: chatMessages element not found');
+      return;
+    }
     
     const messageElement = document.createElement('div');
     messageElement.className = `message ${message.sender}`;
@@ -110,6 +122,7 @@ export class PopupUI {
     messageElement.dataset.id = message.id;
     
     this.chatMessages.appendChild(messageElement);
+    console.log('✅ PopupUI: Message added to chat DOM');
     
     // Add hover functionality for post reference links
     this.setupPostReferenceHovers(messageElement);
@@ -315,11 +328,7 @@ export class PopupUI {
 
   clearChat(): void {
     if (this.chatMessages) {
-      this.chatMessages.innerHTML = `
-        <div class="message system">
-          Welcome to ChatBrowse! How can I help you navigate this website?
-        </div>
-      `;
+      this.chatMessages.innerHTML = '';
       
       // Clean up any lingering tooltips
       this.hidePostPreview();
