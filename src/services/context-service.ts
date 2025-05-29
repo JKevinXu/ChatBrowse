@@ -105,27 +105,38 @@ export class ContextService {
       console.warn(`Content script not ready in tab ${tabId}`);
     }
 
+    console.log('🔧 CONTEXT: Sending EXTRACT_PAGE_INFO message to tab:', tabId);
     return new Promise((resolve) => {
       try {
         chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_PAGE_INFO' }, (pageInfo: PageInfo) => {
+          console.log('🔧 CONTEXT: Received response from content script:', pageInfo);
+          
           if (chrome.runtime.lastError) {
-            console.error(`Error getting page info: ${chrome.runtime.lastError.message}`);
+            console.error(`🔧 CONTEXT: Error getting page info: ${chrome.runtime.lastError.message}`);
             resolve(null);
             return;
           }
 
           if (!pageInfo) {
-            console.error('Page info response is null or undefined');
+            console.error('🔧 CONTEXT: Page info response is null or undefined');
             resolve(null);
             return;
           }
+
+          console.log('🔧 CONTEXT: Page info received successfully:', {
+            title: pageInfo.title,
+            url: pageInfo.url,
+            contentLength: pageInfo.content?.length || 0
+          });
+          console.log('🔧 CONTEXT: Full content preview (first 500 chars):', pageInfo.content?.substring(0, 500));
+          console.log('🔧 CONTEXT: Full content received:', pageInfo.content);
 
           // Mark this tab as having a working content script
           this.contentScriptReadyTabs.add(tabId);
           resolve(pageInfo);
         });
       } catch (error) {
-        console.error('Exception in getPageInfo:', error);
+        console.error('🔧 CONTEXT: Exception in getPageInfo:', error);
         resolve(null);
       }
     });
