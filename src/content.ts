@@ -215,8 +215,18 @@ class ContentScript {
 
   // Message handlers for background script requests
   private handleExtractPageInfo(sendResponse: (response: any) => void): void {
+    console.log('🔧 CONTENT: handleExtractPageInfo called');
     const pageInfo = extractPageInfo();
+    console.log('🔧 CONTENT: Page info extracted:', {
+      title: pageInfo.title,
+      url: pageInfo.url,
+      contentLength: pageInfo.content.length
+    });
+    console.log('🔧 CONTENT: Full page content preview (first 500 chars):', pageInfo.content.substring(0, 500));
+    console.log('🔧 CONTENT: Full page content (complete):', pageInfo.content);
+    console.log('🔧 CONTENT: Sending response back to background');
     sendResponse(pageInfo);
+    console.log('🔧 CONTENT: Response sent');
   }
 
   private handleExtractPosts(payload: any, sendResponse: (response: any) => void): void {
