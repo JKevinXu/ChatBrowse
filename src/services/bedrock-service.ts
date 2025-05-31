@@ -75,16 +75,12 @@ export class BedrockService {
         modelId = 'us.anthropic.claude-sonnet-4-20250514-v1:0';
         console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
         break;
+      case 'claude-3-7-sonnet':
+        modelId = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
+        break;
       case 'claude-3-5-sonnet':
         modelId = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0';
-        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
-        break;
-      case 'claude-3-sonnet':
-        modelId = 'us.anthropic.claude-3-sonnet-20240229-v1:0';
-        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
-        break;
-      case 'claude-3-haiku':
-        modelId = 'us.anthropic.claude-3-haiku-20240307-v1:0';
         console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
         break;
       default:
@@ -158,9 +154,8 @@ export class BedrockService {
     return [
       'claude-4-opus',
       'claude-4-sonnet',
-      'claude-3-5-sonnet',
-      'claude-3-sonnet', 
-      'claude-3-haiku'
+      'claude-3-7-sonnet',
+      'claude-3-5-sonnet'
     ];
   }
 } 
