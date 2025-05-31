@@ -30,20 +30,12 @@ export class ConfigService {
 
   async loadSettings(): Promise<AppSettings> {
     if (this.settings) {
-      console.log('[ConfigService] Using cached settings');
       return this.settings;
     }
 
-    console.log('[ConfigService] Loading settings from storage');
     try {
       const storedSettings = await loadFromStorage<AppSettings>('settings');
       this.settings = storedSettings || this.getDefaultSettings();
-      
-      console.log('[ConfigService] Loaded settings:', JSON.stringify({
-        provider: this.settings.llm?.provider,
-        bedrockModel: this.settings.llm?.bedrock?.model,
-        openaiModel: this.settings.llm?.openai?.model
-      }, null, 2));
       
       // Migrate old OpenAI settings to new LLM structure if needed
       if (this.settings.openaiApiKey && !this.settings.llm) {
@@ -116,7 +108,7 @@ export class ConfigService {
           region: 'us-east-1',
           accessKeyId: '',
           secretAccessKey: '',
-          model: 'claude-3-5-sonnet'
+          model: 'claude-4-sonnet'
         }
       }
     };

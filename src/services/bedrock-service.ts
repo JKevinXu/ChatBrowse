@@ -67,6 +67,14 @@ export class BedrockService {
     
     // Use cross-region inference profiles for better availability
     switch (selectedModel) {
+      case 'claude-4-opus':
+        modelId = 'us.anthropic.claude-opus-4-20250514-v1:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
+        break;
+      case 'claude-4-sonnet':
+        modelId = 'us.anthropic.claude-sonnet-4-20250514-v1:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
+        break;
       case 'claude-3-5-sonnet':
         modelId = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0';
         console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
@@ -148,6 +156,8 @@ export class BedrockService {
 
   getAvailableModels(): string[] {
     return [
+      'claude-4-opus',
+      'claude-4-sonnet',
       'claude-3-5-sonnet',
       'claude-3-sonnet', 
       'claude-3-haiku'
