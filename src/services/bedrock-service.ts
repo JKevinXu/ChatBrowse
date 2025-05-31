@@ -54,8 +54,13 @@ export class BedrockService {
       throw new Error('Bedrock client not initialized');
     }
 
+    // Clear config cache to ensure we get fresh settings
+    this.configService.clearCache();
+    
     const llmSettings = await this.configService.getLLMSettings();
     const selectedModel = llmSettings.bedrock?.model || 'us.anthropic.claude-3-5-sonnet-20241022-v2:0';
+    
+    console.log(`[Bedrock] Selected model from config: ${selectedModel}`);
     
     // Map model selections to proper inference profile ARNs or cross-region IDs
     let modelId = selectedModel;
@@ -64,17 +69,23 @@ export class BedrockService {
     switch (selectedModel) {
       case 'claude-3-5-sonnet':
         modelId = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
         break;
       case 'claude-3-sonnet':
         modelId = 'us.anthropic.claude-3-sonnet-20240229-v1:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
         break;
       case 'claude-3-haiku':
         modelId = 'us.anthropic.claude-3-haiku-20240307-v1:0';
+        console.log(`[Bedrock] Mapped '${selectedModel}' to '${modelId}'`);
         break;
       default:
         // If it's already a proper ID, use it as-is
+        console.log(`[Bedrock] Using model ID as-is: ${modelId}`);
         break;
     }
+
+    console.log(`[Bedrock] Making API call with model: ${modelId}`);
 
     const body = JSON.stringify({
       anthropic_version: "bedrock-2023-05-31",

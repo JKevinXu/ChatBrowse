@@ -22,14 +22,28 @@ export class ConfigService {
     return ConfigService.instance;
   }
 
+  // Clear cache and force reload from storage
+  clearCache(): void {
+    console.log('[ConfigService] Cache cleared - will reload settings from storage');
+    this.settings = null;
+  }
+
   async loadSettings(): Promise<AppSettings> {
     if (this.settings) {
+      console.log('[ConfigService] Using cached settings');
       return this.settings;
     }
 
+    console.log('[ConfigService] Loading settings from storage');
     try {
       const storedSettings = await loadFromStorage<AppSettings>('settings');
       this.settings = storedSettings || this.getDefaultSettings();
+      
+      console.log('[ConfigService] Loaded settings:', JSON.stringify({
+        provider: this.settings.llm?.provider,
+        bedrockModel: this.settings.llm?.bedrock?.model,
+        openaiModel: this.settings.llm?.openai?.model
+      }, null, 2));
       
       // Migrate old OpenAI settings to new LLM structure if needed
       if (this.settings.openaiApiKey && !this.settings.llm) {
@@ -58,6 +72,12 @@ export class ConfigService {
       ...this.settings!,
       ...newSettings
     };
+
+    console.log('[ConfigService] Settings updated:', JSON.stringify({
+      provider: this.settings.llm?.provider,
+      bedrockModel: this.settings.llm?.bedrock?.model,
+      openaiModel: this.settings.llm?.openai?.model
+    }, null, 2));
 
     await this.saveSettings();
   }
