@@ -3,6 +3,14 @@ import { ChatResponse, StorageData } from '../types';
 import { loadFromStorage } from '../utils';
 import { ContextService } from './context-service';
 
+export interface OpenAIResponse {
+  content: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}
+
 export class OpenAIService {
   private openai: OpenAI | null = null;
   private contextService = new ContextService();
@@ -22,6 +30,60 @@ export class OpenAIService {
       console.error('OpenAI initialization failed:', error);
       return false;
     }
+  }
+
+  async isInitialized(): Promise<boolean> {
+    if (this.openai) {
+      return true;
+    }
+    return await this.initialize();
+  }
+
+  async generateText(prompt: string, maxTokens: number = 1000): Promise<OpenAIResponse> {
+    if (!this.openai) {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        throw new Error('OpenAI client not initialized. Please check your API key.');
+      }
+    }
+
+    try {
+      const completion = await this.openai!.chat.completions.create({
+        model: 'gpt-4-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens
+      });
+
+      return {
+        content: completion.choices[0]?.message?.content?.trim() || '',
+        usage: completion.usage ? {
+          inputTokens: completion.usage.prompt_tokens || 0,
+          outputTokens: completion.usage.completion_tokens || 0
+        } : undefined
+      };
+    } catch (error) {
+      console.error('OpenAI API call failed:', error);
+      throw new Error(`OpenAI API error: ${(error as Error).message}`);
+    }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.generateText("Hello", 10);
+      return true;
+    } catch (error) {
+      console.error('OpenAI connection test failed:', error);
+      return false;
+    }
+  }
+
+  getAvailableModels(): string[] {
+    return [
+      'gpt-4-turbo',
+      'gpt-4',
+      'gpt-3.5-turbo',
+      'gpt-3.5-turbo-16k'
+    ];
   }
 
   async handleChat(

@@ -18,6 +18,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.821.0",
+    "@aws-sdk/credential-providers": "^3.821.0",
     "@mozilla/readability": "^0.6.0",
     "@types/marked": "^5.0.2",
     "marked": "^15.0.12",

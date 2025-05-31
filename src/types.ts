@@ -31,10 +31,31 @@ export interface PageInfo {
   useAsContext?: boolean;
 }
 
+export type LLMProvider = 'openai' | 'bedrock';
+
+export interface OpenAIConfig {
+  apiKey: string;
+  model?: string;
+}
+
+export interface BedrockConfig {
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  model?: string;
+}
+
+export interface LLMSettings {
+  provider: LLMProvider;
+  openai?: OpenAIConfig;
+  bedrock?: BedrockConfig;
+}
+
 export interface StorageData {
   sessions: Record<string, ChatSession>;
   settings: {
-    openaiApiKey?: string;
+    openaiApiKey?: string; // Kept for backward compatibility
     showNotifications: boolean;
+    llm?: LLMSettings;
   };
 } 

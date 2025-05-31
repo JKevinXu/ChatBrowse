@@ -10,7 +10,7 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 500px;
+            max-width: 600px;
             background: white;
             padding: 20px;
             border-radius: 8px;
@@ -29,7 +29,7 @@
             font-weight: 500;
             color: #555;
         }
-        input[type="password"], input[type="text"] {
+        input[type="password"], input[type="text"], select {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -71,6 +71,19 @@
         .save-btn:hover {
             background: #005a87;
         }
+        .test-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .test-btn:hover {
+            background: #218838;
+        }
         .status {
             margin-top: 10px;
             padding: 10px;
@@ -101,6 +114,46 @@
             border-bottom: none;
             margin-bottom: 0;
         }
+        .provider-config {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .provider-config.active {
+            display: block;
+        }
+        .input-with-button {
+            display: flex;
+            align-items: center;
+        }
+        .input-with-button input {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .provider-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .provider-tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+        }
+        .provider-tab.active {
+            color: #007cba;
+            border-bottom-color: #007cba;
+        }
+        .provider-tab:hover {
+            background: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -109,12 +162,76 @@
         
         <div class="section">
             <div class="form-group">
-                <label for="apiKeyInput">OpenAI API Key:</label>
-                <div style="display: flex; align-items: center;">
-                    <input type="password" id="apiKeyInput" placeholder="Enter your OpenAI API key">
-                    <button type="button" class="toggle-btn" id="toggleApiKeyVisibility">Show</button>
+                <label for="llmProvider">AI Provider:</label>
+                <select id="llmProvider">
+                    <option value="openai">OpenAI</option>
+                    <option value="bedrock">AWS Bedrock</option>
+                </select>
+                <div class="help-text">Choose your preferred AI provider for chat responses.</div>
+            </div>
+            
+            <!-- OpenAI Configuration -->
+            <div id="openaiConfig" class="provider-config">
+                <h3>OpenAI Configuration</h3>
+                <div class="form-group">
+                    <label for="openaiApiKey">API Key:</label>
+                    <div class="input-with-button">
+                        <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key">
+                        <button type="button" class="toggle-btn" id="toggleOpenaiApiKey">Show</button>
+                        <button type="button" class="test-btn" id="testOpenaiConnection">Test</button>
+                    </div>
+                    <div class="help-text">Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a></div>
                 </div>
-                <div class="help-text">Your API key is stored locally and never shared.</div>
+                <div class="form-group">
+                    <label for="openaiModel">Model:</label>
+                    <select id="openaiModel">
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Bedrock Configuration -->
+            <div id="bedrockConfig" class="provider-config">
+                <h3>AWS Bedrock Configuration</h3>
+                <div class="form-group">
+                    <label for="bedrockRegion">AWS Region:</label>
+                    <select id="bedrockRegion">
+                        <option value="us-east-1">US East (N. Virginia)</option>
+                        <option value="us-west-2">US West (Oregon)</option>
+                        <option value="eu-west-1">Europe (Ireland)</option>
+                        <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                        <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="bedrockAccessKey">Access Key ID:</label>
+                    <div class="input-with-button">
+                        <input type="password" id="bedrockAccessKey" placeholder="Enter your AWS Access Key ID">
+                        <button type="button" class="toggle-btn" id="toggleBedrockAccessKey">Show</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="bedrockSecretKey">Secret Access Key:</label>
+                    <div class="input-with-button">
+                        <input type="password" id="bedrockSecretKey" placeholder="Enter your AWS Secret Access Key">
+                        <button type="button" class="toggle-btn" id="toggleBedrockSecretKey">Show</button>
+                        <button type="button" class="test-btn" id="testBedrockConnection">Test</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="bedrockModel">Model:</label>
+                    <select id="bedrockModel">
+                        <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Recommended)</option>
+                        <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                        <option value="claude-3-haiku">Claude 3 Haiku (Fast)</option>
+                    </select>
+                </div>
+                <div class="help-text">
+                    You need AWS credentials with Bedrock access. Ensure you have the necessary permissions and the models are enabled in your AWS account.
+                </div>
             </div>
         </div>
 

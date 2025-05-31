@@ -1,5 +1,5 @@
 import { ChatResponse } from '../types';
-import { OpenAIService } from './openai-service';
+import { LLMService } from './llm-service';
 import { NavigationService } from './navigation-service';
 import { SearchService } from './search-service';
 import { ActionService } from './action-service';
@@ -22,7 +22,7 @@ declare global {
 }
 
 export class MessageRouter {
-  private openaiService = new OpenAIService();
+  private llmService = LLMService.getInstance();
   private navigationService = new NavigationService();
   private searchService = new SearchService();
   private actionService = new ActionService();
@@ -175,7 +175,7 @@ export class MessageRouter {
 
     // Handle general AI chat
     console.log('🐛 DEBUG: Falling back to general AI chat');
-    await this.openaiService.handleChat(payload, sender, sendResponse);
+    await this.llmService.handleChat(payload, sender, sendResponse);
     return true;
   }
 
@@ -327,7 +327,7 @@ export class MessageRouter {
     sender: chrome.runtime.MessageSender,
     sendResponse: (response: any) => void
   ): Promise<boolean> {
-    await this.openaiService.analyzeSearchElements(payload, sendResponse);
+    await this.llmService.analyzeSearchElements(payload, sendResponse);
     return true;
   }
 
@@ -428,7 +428,7 @@ export class MessageRouter {
             console.log('🐛 DEBUG: Prepared content for AI, length:', contentForAI.length);
 
             // Call OpenAI service for summarization
-            await this.openaiService.handleChat({
+            await this.llmService.handleChat({
               text: contentForAI,
               sessionId: payload.sessionId || 'default',
               tabId: undefined

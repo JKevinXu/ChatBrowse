@@ -1,10 +1,12 @@
 import { loadFromStorage, saveToStorage } from '../utils';
+import { LLMProvider, LLMSettings, OpenAIConfig, BedrockConfig } from '../types';
 
 export interface AppSettings {
   showNotifications: boolean;
   openaiApiKey: string;
   theme?: 'light' | 'dark';
   language?: string;
+  llm?: LLMSettings;
 }
 
 export class ConfigService {
@@ -28,6 +30,19 @@ export class ConfigService {
     try {
       const storedSettings = await loadFromStorage<AppSettings>('settings');
       this.settings = storedSettings || this.getDefaultSettings();
+      
+      // Migrate old OpenAI settings to new LLM structure if needed
+      if (this.settings.openaiApiKey && !this.settings.llm) {
+        this.settings.llm = {
+          provider: 'openai',
+          openai: {
+            apiKey: this.settings.openaiApiKey,
+            model: 'gpt-4-turbo'
+          }
+        };
+        await this.saveSettings();
+      }
+      
       return this.settings;
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -44,6 +59,10 @@ export class ConfigService {
       ...newSettings
     };
 
+    await this.saveSettings();
+  }
+
+  private async saveSettings(): Promise<void> {
     try {
       await saveToStorage('settings', this.settings);
     } catch (error) {
@@ -66,17 +85,77 @@ export class ConfigService {
       showNotifications: true,
       openaiApiKey: '',
       theme: 'light',
-      language: 'en'
+      language: 'en',
+      llm: {
+        provider: 'openai',
+        openai: {
+          apiKey: '',
+          model: 'gpt-4-turbo'
+        },
+        bedrock: {
+          region: 'us-east-1',
+          accessKeyId: '',
+          secretAccessKey: '',
+          model: 'claude-3-5-sonnet'
+        }
+      }
     };
+  }
+
+  // LLM-specific methods
+  async getLLMSettings(): Promise<LLMSettings> {
+    const settings = await this.loadSettings();
+    return settings.llm || this.getDefaultSettings().llm!;
+  }
+
+  async setLLMProvider(provider: LLMProvider): Promise<void> {
+    const currentLLM = await this.getLLMSettings();
+    await this.updateSettings({
+      llm: {
+        ...currentLLM,
+        provider
+      }
+    });
+  }
+
+  async setOpenAIConfig(config: OpenAIConfig): Promise<void> {
+    const currentLLM = await this.getLLMSettings();
+    await this.updateSettings({
+      llm: {
+        ...currentLLM,
+        provider: 'openai',
+        openai: config
+      },
+      openaiApiKey: config.apiKey // Keep backward compatibility
+    });
+  }
+
+  async setBedrockConfig(config: BedrockConfig): Promise<void> {
+    const currentLLM = await this.getLLMSettings();
+    await this.updateSettings({
+      llm: {
+        ...currentLLM,
+        provider: 'bedrock',
+        bedrock: config
+      }
+    });
   }
 
   // Convenience methods for common settings
   async getOpenAIApiKey(): Promise<string> {
-    return this.getSetting('openaiApiKey');
+    const llmSettings = await this.getLLMSettings();
+    return llmSettings.openai?.apiKey || this.getSetting('openaiApiKey') || '';
   }
 
   async setOpenAIApiKey(apiKey: string): Promise<void> {
     await this.setSetting('openaiApiKey', apiKey);
+    const currentLLM = await this.getLLMSettings();
+    if (currentLLM.openai) {
+      await this.setOpenAIConfig({
+        ...currentLLM.openai,
+        apiKey
+      });
+    }
   }
 
   async getNotificationPreference(): Promise<boolean> {
