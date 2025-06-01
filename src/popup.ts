@@ -24,6 +24,9 @@ class PopupApp {
       this.ui.initialize();
       console.log('✅ PopupApp: UI initialized successfully');
 
+      // Connect UI to message handler for loading indicators
+      this.messageHandler.setUI(this.ui);
+
       console.log('🔧 PopupApp: Getting current tab...');
       // Get current tab and load session
       const tabs = await this.sessionManager.getCurrentTab();
@@ -51,12 +54,7 @@ class PopupApp {
         this.renderMessages(fallbackSession.messages);
       }
     } catch (error) {
-      console.error('❌ PopupApp: Error during initialization:', error);
-      console.error('❌ PopupApp: Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Show error message in UI
-      const errorMessage = createMessage('Error loading session. Please try again.', 'system');
-      this.ui.addMessageToChat(errorMessage);
+      console.error('❌ PopupApp: Initialization failed:', error);
     }
 
     console.log('🔧 PopupApp: Focusing input...');
@@ -109,10 +107,22 @@ class PopupApp {
     this.ui.addMessageToChat(userMessage);
     await this.sessionManager.addMessageToSession(userMessage);
 
+    // Show loading states
+    this.ui.setSendButtonLoading(true);
+    this.ui.setInputDisabled(true);
+    this.ui.showTypingIndicator();
+
     // Send to background for processing
     try {
       console.log('🔧 PopupApp: Sending message to background...');
       const systemMessage = await this.messageHandler.sendMessage(text, session.id);
+      
+      // Hide loading states before showing response
+      this.ui.hideTypingIndicator();
+      this.ui.hideProcessingIndicator();
+      this.ui.setSendButtonLoading(false);
+      this.ui.setInputDisabled(false);
+      
       if (systemMessage) {
         console.log('✅ PopupApp: Received system message');
         this.ui.addMessageToChat(systemMessage);
@@ -120,6 +130,13 @@ class PopupApp {
       }
     } catch (error) {
       console.error('❌ PopupApp: Error sending message:', error);
+      
+      // Hide loading states on error
+      this.ui.hideTypingIndicator();
+      this.ui.hideProcessingIndicator();
+      this.ui.setSendButtonLoading(false);
+      this.ui.setInputDisabled(false);
+      
       const errorMessage = createMessage('Error sending message. Please try again.', 'system');
       this.ui.addMessageToChat(errorMessage);
     }

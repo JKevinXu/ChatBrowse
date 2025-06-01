@@ -336,19 +336,93 @@ export class PopupUI {
   }
 
   showTypingIndicator(): void {
+    // Remove any existing typing indicator
+    this.hideTypingIndicator();
+    
     const typingElement = document.createElement('div');
     typingElement.className = 'message system typing';
-    typingElement.innerHTML = '<em>ChatBrowse is thinking...</em>';
     typingElement.id = 'typing-indicator';
+    
+    // Create animated typing indicator with dots
+    typingElement.innerHTML = `
+      <div class="typing-content">
+        <span class="typing-text">ChatBrowse is thinking</span>
+        <div class="typing-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    `;
     
     this.chatMessages?.appendChild(typingElement);
     this.chatMessages!.scrollTop = this.chatMessages!.scrollHeight;
   }
 
   hideTypingIndicator(): void {
-    const typingElement = document.getElementById('typing-indicator');
-    if (typingElement) {
-      typingElement.remove();
+    const existingIndicator = document.getElementById('typing-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
     }
+  }
+
+  showProcessingIndicator(message: string = 'Processing your request'): void {
+    // Remove any existing typing indicator
+    this.hideTypingIndicator();
+    
+    const processingElement = document.createElement('div');
+    processingElement.className = 'message system processing';
+    processingElement.id = 'processing-indicator';
+    
+    processingElement.innerHTML = `
+      <div class="processing-content">
+        <div class="processing-spinner"></div>
+        <span class="processing-text">${message}</span>
+      </div>
+    `;
+    
+    this.chatMessages?.appendChild(processingElement);
+    this.chatMessages!.scrollTop = this.chatMessages!.scrollHeight;
+  }
+
+  hideProcessingIndicator(): void {
+    const existingIndicator = document.getElementById('processing-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+  }
+
+  updateProcessingMessage(message: string): void {
+    const indicator = document.getElementById('processing-indicator');
+    if (indicator) {
+      const textElement = indicator.querySelector('.processing-text');
+      if (textElement) {
+        textElement.textContent = message;
+      }
+    }
+  }
+
+  setSendButtonLoading(loading: boolean): void {
+    if (!this.sendButton) return;
+    
+    const buttonElement = this.sendButton as HTMLButtonElement;
+    
+    if (loading) {
+      buttonElement.disabled = true;
+      buttonElement.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="button-spinner"></div>
+          <span>Sending...</span>
+        </div>
+      `;
+    } else {
+      buttonElement.disabled = false;
+      buttonElement.innerHTML = 'Send';
+    }
+  }
+
+  setInputDisabled(disabled: boolean): void {
+    if (!this.userInput) return;
+    (this.userInput as HTMLInputElement).disabled = disabled;
   }
 }

@@ -578,4 +578,77 @@ export class ChatUI {
       element.style.cursor = 'default';
     });
   }
+
+  showTypingIndicator(): void {
+    // Remove any existing typing indicator
+    this.hideTypingIndicator();
+    
+    const messagesContainer = document.getElementById('chatbrowse-messages');
+    if (!messagesContainer) return;
+    
+    const typingElement = document.createElement('div');
+    typingElement.className = 'chatbrowse-message system typing';
+    typingElement.id = 'chatbrowse-typing-indicator';
+    
+    // Create animated typing indicator with dots
+    typingElement.innerHTML = `
+      <div class="typing-content">
+        <span class="typing-text">ChatBrowse is thinking</span>
+        <div class="typing-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    `;
+    
+    messagesContainer.appendChild(typingElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  hideTypingIndicator(): void {
+    const existingIndicator = document.getElementById('chatbrowse-typing-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+  }
+
+  showProcessingIndicator(message: string = 'Processing your request'): void {
+    // Remove any existing typing indicator
+    this.hideTypingIndicator();
+    
+    const messagesContainer = document.getElementById('chatbrowse-messages');
+    if (!messagesContainer) return;
+    
+    const processingElement = document.createElement('div');
+    processingElement.className = 'chatbrowse-message system processing';
+    processingElement.id = 'chatbrowse-processing-indicator';
+    
+    processingElement.innerHTML = `
+      <div class="processing-content">
+        <div class="processing-spinner"></div>
+        <span class="processing-text">${message}</span>
+      </div>
+    `;
+    
+    messagesContainer.appendChild(processingElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  hideProcessingIndicator(): void {
+    const existingIndicator = document.getElementById('chatbrowse-processing-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+  }
+
+  updateProcessingMessage(message: string): void {
+    const indicator = document.getElementById('chatbrowse-processing-indicator');
+    if (indicator) {
+      const textElement = indicator.querySelector('.processing-text');
+      if (textElement) {
+        textElement.textContent = message;
+      }
+    }
+  }
 }

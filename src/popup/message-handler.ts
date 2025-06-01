@@ -3,11 +3,16 @@ import { createMessage } from '../utils';
 
 export class MessageHandler {
   private onMessageReceived?: (message: Message) => void;
-  private activeRequestId?: string;
+  private activeRequestId: string | null = null;
+  private ui?: any; // Reference to UI for showing loading states
 
   constructor(onMessageReceived?: (message: Message) => void) {
     this.onMessageReceived = onMessageReceived;
     this.setupMessageListeners();
+  }
+
+  setUI(ui: any): void {
+    this.ui = ui;
   }
 
   private setupMessageListeners(): void {
@@ -30,6 +35,20 @@ export class MessageHandler {
       // Handle multi-part responses (like Xiaohongshu summarization)
       if (request.type === 'MESSAGE' && request.payload && request.payload.sessionId) {
         console.log('🐛 POPUP DEBUG: Received multi-part response:', request);
+        
+        // Hide typing indicator and show processing for long operations
+        if (this.ui) {
+          this.ui.hideTypingIndicator();
+          
+          // If this looks like a progress message, show it as processing
+          const text = request.payload.text;
+          if (text.includes('Searching') || text.includes('Extracting') || text.includes('Analyzing')) {
+            this.ui.showProcessingIndicator(text);
+          } else {
+            this.ui.hideProcessingIndicator();
+          }
+        }
+        
         const responseMessage = createMessage(request.payload.text, 'system');
         
         if (this.onMessageReceived) {

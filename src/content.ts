@@ -1,5 +1,5 @@
 import { ChatSession } from './types';
-import { createChatSession, extractPageInfo, processCommand } from './utils';
+import { createChatSession, extractPageInfo, processCommand, createMessage } from './utils';
 import { ChatUI } from './content/chat-ui';
 import { PageAnalyzer } from './content/page-analyzer';
 import { ActionExecutor } from './content/action-executor';
@@ -192,6 +192,13 @@ class ContentScript {
   }
 
   private handleChatCommand(text: string): void {
+    // Add user message to UI
+    const userMessage = createMessage(text, 'user');
+    this.chatUI.addMessageToChat(userMessage);
+    
+    // Show typing indicator
+    this.chatUI.showTypingIndicator();
+    
     chrome.runtime.sendMessage({
       type: 'SEND_MESSAGE',
       payload: {
@@ -202,6 +209,9 @@ class ContentScript {
         tabTitle: document.title
       }
     }, (response) => {
+      // Hide typing indicator
+      this.chatUI.hideTypingIndicator();
+      
       if (response && response.type === 'MESSAGE') {
         this.chatUI.addMessageToChat({
           id: Date.now().toString(),
