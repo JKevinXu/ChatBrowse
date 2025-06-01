@@ -42,8 +42,13 @@ export class MessageHandler {
           
           // If this looks like a progress message, show it as processing
           const text = request.payload.text;
-          if (text.includes('Searching') || text.includes('Extracting') || text.includes('Analyzing')) {
+          const isProgressMessage = text.includes('Searching') || text.includes('Extracting') || text.includes('Analyzing');
+          
+          if (isProgressMessage) {
             this.ui.showProcessingIndicator(text);
+            // Don't add progress messages to chat history - they're shown as processing indicators
+            sendResponse({ received: true });
+            return;
           } else {
             this.ui.hideProcessingIndicator();
           }

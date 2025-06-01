@@ -4,19 +4,22 @@ export class ExtractionService {
   async extractXiaohongshuPosts(
     tabId: number | undefined,
     sendResponse: (response: ChatResponse) => void,
-    sessionId: string
+    sessionId: string,
+    sendProgressMessages: boolean = true // Add parameter to control progress messages
   ): Promise<any> { // Return the extraction result instead of handling summarization
     try {
       console.log('🐛 DEBUG: extractXiaohongshuPosts STARTED, extracting full content by default');
       
-      // Send immediate feedback
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...`,
-          sessionId
-        }
-      });
+      // Send immediate feedback only if requested
+      if (sendProgressMessages) {
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: `🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...`,
+            sessionId
+          }
+        });
+      }
 
       // Find the Xiaohongshu tab instead of using the sender tab
       console.log('🐛 DEBUG: Looking for Xiaohongshu tab...');
@@ -151,7 +154,7 @@ export class ExtractionService {
   ): Promise<void> {
     switch (platform.toLowerCase()) {
       case 'xiaohongshu':
-        await this.extractXiaohongshuPosts(tabId, sendResponse, sessionId);
+        await this.extractXiaohongshuPosts(tabId, sendResponse, sessionId, true); // Enable progress messages for direct extraction
         break;
       default:
         sendResponse({

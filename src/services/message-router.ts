@@ -162,7 +162,7 @@ export class MessageRouter {
     // Check for Xiaohongshu post extraction
     if (text.toLowerCase().includes('extract') && text.toLowerCase().includes('xiaohongshu')) {
       console.log('🐛 DEBUG: Xiaohongshu extract command detected');
-      await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId);
+      await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId, true);
       return true;
     }
 
@@ -374,6 +374,16 @@ export class MessageRouter {
         }, payload.sessionId || 'default');
         
         console.log('🐛 DEBUG: searchService.handleSearch completed without error');
+        
+        // Send completion message to chat history
+        sendFollowUpToPopup({
+          type: 'MESSAGE',
+          payload: {
+            text: `Searched Xiaohongshu for "${payload.query}" and navigated to results page`,
+            sessionId: payload.sessionId || 'default'
+          }
+        });
+        
       } catch (searchError) {
         console.error('🐛 DEBUG: Search service error:', searchError);
         sendFollowUpToPopup({
@@ -395,7 +405,7 @@ export class MessageRouter {
           sendFollowUpToPopup({
             type: 'MESSAGE',
             payload: {
-              text: '📱 Page should be loaded now. Extracting posts...',
+              text: '🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...',
               sessionId: payload.sessionId || 'default'
             }
           });
@@ -405,8 +415,8 @@ export class MessageRouter {
           // Step 3: Extract the posts with error handling
           const extractionResult = await this.extractionService.extractXiaohongshuPosts(payload.tabId, (extractResponse) => {
             console.log('🐛 DEBUG: Extract progress response received:', extractResponse);
-            sendFollowUpToPopup(extractResponse);
-          }, payload.sessionId || 'default');
+            // Don't forward progress responses since we already sent our own message above
+          }, payload.sessionId || 'default', false); // Disable progress messages from extraction service
 
           console.log('🐛 DEBUG: extractXiaohongshuPosts completed, result:', extractionResult);
 
@@ -414,7 +424,16 @@ export class MessageRouter {
           if (extractionResult?.success && extractionResult.posts && extractionResult.posts.length > 0) {
             console.log('🐛 DEBUG: Extraction successful, sending to AI for summarization');
             
-            // Send progress message
+            // Send extraction completion message to chat history
+            sendFollowUpToPopup({
+              type: 'MESSAGE',
+              payload: {
+                text: `Extracted ${extractionResult.posts.length} posts from Xiaohongshu page with rate limiting`,
+                sessionId: payload.sessionId || 'default'
+              }
+            });
+            
+            // Send progress message for AI analysis
             sendFollowUpToPopup({
               type: 'MESSAGE',
               payload: {
@@ -436,6 +455,15 @@ export class MessageRouter {
               console.log('🐛 DEBUG: Received AI summary response:', aiResponse);
               
               if (aiResponse && aiResponse.type === 'MESSAGE' && aiResponse.payload?.text) {
+                // Send AI analysis completion message to chat history
+                sendFollowUpToPopup({
+                  type: 'MESSAGE',
+                  payload: {
+                    text: `Analyzed extracted content with AI to create intelligent summary`,
+                    sessionId: payload.sessionId || 'default'
+                  }
+                });
+                
                 // Create reference section programmatically
                 const referenceSection = this.createReferenceSection(extractionResult);
                 
