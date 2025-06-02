@@ -81,6 +81,31 @@ export class SearchService {
             successMessage = `✅ Opened Xiaohongshu search results for "${query}" in a new tab.`;
           }
           successMessage += `\n\n📱 Browse the results or ask me to "summarize xiaohongshu posts about ${query}" to extract and analyze them.`;
+        } else if (engine === 'google') {
+          if (result.newTab && result.background) {
+            successMessage = `✅ Opened Google search for "${query}" in a background tab.`;
+            successMessage += `\n\n📤 Now extracting and summarizing search results...`;
+          } else if (result.newTab) {
+            successMessage = `✅ Opened Google search for "${query}" in a new tab.`;
+            successMessage += `\n\n📤 Now extracting and summarizing search results...`;
+          } else {
+            successMessage += `\n\n📤 Now extracting and summarizing search results...`;
+          }
+          
+          // Send navigation success message
+          sendResponse({
+            type: 'MESSAGE',
+            payload: {
+              text: successMessage,
+              sessionId
+            }
+          });
+          
+          // Start the extraction and summarization process for Google
+          // Use the new tab ID if available, otherwise fall back to original tabId
+          const extractionTabId = result.tabId || tabId;
+          await this.handleGoogleSearchExtraction(query, extractionTabId, sendResponse, sessionId);
+          return;
         } else {
           successMessage += `\n\n📱 Browse the results manually or ask me to help extract information.`;
         }
@@ -149,16 +174,23 @@ export class SearchService {
         return;
       }
       
-      // For Xiaohongshu, open in new tab to preserve chat session
-      if (url.includes('xiaohongshu.com')) {
+      // For both Xiaohongshu and Google, open in new tab to preserve chat session
+      if (url.includes('xiaohongshu.com') || url.includes('google.com')) {
+        const isGoogle = url.includes('google.com');
         chrome.tabs.create({ 
           url, 
-          active: false  // Open in background to keep popup open
+          active: !isGoogle  // Google: background tab, Xiaohongshu: background tab
         }, (newTab) => {
           if (chrome.runtime.lastError) {
             resolve({ success: false, error: chrome.runtime.lastError.message });
           } else {
-            resolve({ success: true, url, newTab: true, background: true });
+            resolve({ 
+              success: true, 
+              url, 
+              newTab: true, 
+              background: !isGoogle,  // Google opens in background for extraction
+              tabId: newTab.id
+            });
           }
         });
       } else {
@@ -172,5 +204,534 @@ export class SearchService {
         });
       }
     });
+  }
+
+  private async handleGoogleSearchExtraction(
+    query: string,
+    tabId: number | undefined,
+    sendResponse: (response: ChatResponse) => void,
+    sessionId: string
+  ): Promise<void> {
+    try {
+      console.log('🔍 Starting Google search result extraction for:', query);
+      console.log('🔍 Tab ID for extraction:', tabId);
+      
+      if (!tabId) {
+        console.error('❌ No tab ID provided for Google extraction');
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: `⚠️ Cannot extract Google results: No tab ID available`,
+            sessionId
+          }
+        });
+        return;
+      }
+      
+      // Wait a bit for the page to load
+      console.log('⏳ Waiting for Google page to load...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait time to 5 seconds
+      
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: `📤 Extracting search results from Google...`,
+          sessionId
+        }
+      });
+      
+      console.log('🚀 Starting Google results extraction with tab ID:', tabId);
+      
+      // Extract Google search results using content script injection
+      const extractionResult = await this.extractGoogleResults(tabId);
+      
+      console.log('📊 Extraction result received:', extractionResult);
+      
+      // Fix: Access the nested result structure
+      const actualResult = extractionResult?.result || extractionResult;
+      const isSuccess = extractionResult?.success && actualResult?.posts && actualResult.posts.length > 0;
+      
+      if (isSuccess) {
+        console.log('✅ Google extraction successful, posts found:', actualResult.posts.length);
+        console.log('📝 Sample post:', actualResult.posts[0]);
+        
+        // Format the results for display in chat
+        const formattedResults = this.formatGoogleResults(actualResult, query);
+        console.log('📋 Formatted results length:', formattedResults.length);
+        
+        // Send formatted results via both methods
+        const resultsResponse = {
+          type: 'MESSAGE' as const,
+          payload: {
+            text: formattedResults,
+            sessionId
+          }
+        };
+        
+        sendResponse(resultsResponse);
+        console.log('📤 Formatted results sent to chat interface');
+        
+        // Also send directly to content script
+        chrome.tabs.sendMessage(tabId, resultsResponse).catch(() => {
+          console.log('💡 Could not send direct message to content script (this is normal if using popup)');
+        });
+        
+        // Send to popup as well (for popup users)
+        chrome.runtime.sendMessage(resultsResponse).catch(() => {
+          console.log('💡 Could not send message to popup (this is normal if popup is closed)');
+        });
+        
+        // Optional: Also provide AI summary
+        setTimeout(async () => {
+          try {
+            console.log('🤖 Starting AI summary generation...');
+            const progressResponse = {
+              type: 'MESSAGE' as const,
+              payload: {
+                text: `🤖 Generating AI analysis of the search results...`,
+                sessionId
+              }
+            };
+            
+            sendResponse(progressResponse);
+            
+            // Also send progress directly to content script
+            chrome.tabs.sendMessage(tabId, progressResponse).catch(() => {
+              console.log('💡 Could not send progress message to content script (this is normal if using popup)');
+            });
+            
+            // Send progress to popup as well
+            chrome.runtime.sendMessage(progressResponse).catch(() => {
+              console.log('💡 Could not send progress message to popup (this is normal if popup is closed)');
+            });
+            
+            await this.generateGoogleResultsSummary(actualResult, query, sendResponse, sessionId, tabId);
+          } catch (summaryError) {
+            console.error('❌ Google summary error:', summaryError);
+            const errorResponse = {
+              type: 'MESSAGE' as const,
+              payload: {
+                text: `⚠️ Results extracted successfully, but AI summary failed: ${(summaryError as Error).message}`,
+                sessionId
+              }
+            };
+            
+            sendResponse(errorResponse);
+            
+            // Also send error directly to content script
+            chrome.tabs.sendMessage(tabId, errorResponse).catch(() => {
+              console.log('💡 Could not send error message to content script (this is normal if using popup)');
+            });
+            
+            // Send error to popup as well
+            chrome.runtime.sendMessage(errorResponse).catch(() => {
+              console.log('💡 Could not send error message to popup (this is normal if popup is closed)');
+            });
+          }
+        }, 1000);
+        
+      } else {
+        console.error('❌ Google extraction failed or no results found');
+        console.error('❌ Extraction result:', extractionResult);
+        sendResponse({
+          type: 'MESSAGE',
+          payload: {
+            text: `⚠️ Could not extract search results from Google. This may be due to anti-bot protections or page structure changes. You can browse the results manually.`,
+            sessionId
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Google search extraction error:', error);
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: `❌ Failed to extract Google results: ${(error as Error).message}`,
+          sessionId
+        }
+      });
+    }
+  }
+
+  private async extractGoogleResults(tabId: number): Promise<any> {
+    return new Promise((resolve) => {
+      console.log('🎯 extractGoogleResults called with tabId:', tabId);
+      
+      // Inject the Google extractor into the page using modern scripting API
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          console.log('🔍 Google extractor function started in page context');
+          console.log('🌐 Current URL:', window.location.href);
+          console.log('📄 Page title:', document.title);
+          
+          // Google extractor logic injected into the page
+          class GoogleExtractor {
+            platform = 'google';
+            
+            canHandle() {
+              const canHandle = window.location.hostname.includes('google.com') && 
+                               window.location.pathname.includes('/search');
+              console.log('🤔 Can handle this page:', canHandle);
+              return canHandle;
+            }
+            
+            extractPosts(maxPosts = 5) {
+              console.log('🔍 Starting Google search results extraction');
+              const posts: any[] = [];
+              
+              // Updated Google search result selectors for current layout
+              const resultSelectors = [
+                'div[data-sokoban-container] div[data-sokoban-grid] > div', // Current Google layout
+                'div.g', // Classic organic results
+                'div.tF2Cxc', // Another modern layout
+                'div.MjjYud', // Yet another layout variant
+                '[jscontroller="SC7lYd"]', // Specific Google controller
+                'div[data-hveid] div.g', // Results with hover IDs
+                'div.srg div.g', // Search results group
+                '.g .rc', // Classic result container
+                'div[data-async-context]', // Async loaded results
+              ];
+              
+              let resultElements: Element[] = [];
+              
+              for (const selector of resultSelectors) {
+                try {
+                  console.log('🔎 Trying selector:', selector);
+                  const elements = Array.from(document.querySelectorAll(selector));
+                  console.log('📊 Found elements with selector:', elements.length);
+                  
+                  if (elements.length > 0) {
+                    resultElements = elements.filter(el => {
+                      const text = el.textContent || '';
+                      const hasTitle = el.querySelector('h3, h2, h1, [role="heading"]');
+                      const hasLink = el.querySelector('a[href]:not([href^="#"]):not([href^="javascript"])');
+                      const isAd = text.includes('Ad') || text.includes('Sponsored') || 
+                                  text.includes('广告') || el.getAttribute('data-text-ad') || 
+                                  el.closest('[data-text-ad]');
+                      const isValid = hasTitle && hasLink && !isAd && text.length > 30;
+                      
+                      if (isValid) {
+                        console.log('✅ Valid result found:', el);
+                      }
+                      return isValid;
+                    });
+                    console.log('✅ Filtered to valid elements:', resultElements.length);
+                    if (resultElements.length > 0) break;
+                  }
+                } catch (e) { 
+                  console.log('❌ Selector failed:', selector, e); 
+                }
+              }
+              
+              // If no results found with specific selectors, try a more general approach
+              if (resultElements.length === 0) {
+                console.log('🔄 No results with specific selectors, trying general approach');
+                
+                // Look for any div that contains both a heading and a link
+                const allDivs = Array.from(document.querySelectorAll('div'));
+                console.log('📊 Total divs on page:', allDivs.length);
+                
+                resultElements = allDivs.filter(div => {
+                  const hasHeading = div.querySelector('h3, h2, h1, [role="heading"]');
+                  const hasLink = div.querySelector('a[href]');
+                  const text = div.textContent || '';
+                  const isAd = text.includes('Ad') || text.includes('Sponsored') || text.includes('广告');
+                  
+                  // Must have heading, link, reasonable text length, and not be an ad
+                  const isValid = hasHeading && hasLink && text.length > 50 && text.length < 2000 && !isAd;
+                  
+                  if (isValid) {
+                    console.log('✅ General approach found result:', hasHeading.textContent?.substring(0, 50));
+                  }
+                  
+                  return isValid;
+                });
+                
+                console.log('✅ General approach found:', resultElements.length, 'results');
+              }
+              
+              console.log('📋 Final resultElements count:', resultElements.length);
+              
+              // Extract results
+              resultElements.slice(0, maxPosts).forEach((result, index) => {
+                try {
+                  console.log('🔍 Processing result', index + 1);
+                  
+                  // Updated title extraction for modern Google layout
+                  const titleSelectors = [
+                    'h3', // Most common
+                    'h2', 
+                    'h1',
+                    '[role="heading"]',
+                    'a h3',
+                    'div[role="heading"]',
+                    'span[role="heading"]',
+                    '.LC20lb', // Google specific title class
+                    '.DKV0Md', // Another Google title class
+                  ];
+                  
+                  let title = '';
+                  for (const sel of titleSelectors) {
+                    const titleEl = result.querySelector(sel);
+                    if (titleEl?.textContent?.trim()) {
+                      title = titleEl.textContent.trim();
+                      break;
+                    }
+                  }
+                  
+                  // Updated link extraction
+                  const linkSelectors = [
+                    'h3 a[href]',
+                    'h2 a[href]', 
+                    'h1 a[href]',
+                    '[role="heading"] a[href]',
+                    'a[href]:not([href^="#"]):not([href^="javascript"])',
+                    '.yuRUbf a[href]', // Google specific link container
+                  ];
+                  
+                  let link = '';
+                  for (const sel of linkSelectors) {
+                    const linkEl = result.querySelector(sel) as HTMLAnchorElement;
+                    if (linkEl?.href && !linkEl.href.includes('google.com/search') && !linkEl.href.includes('google.com/url')) {
+                      link = linkEl.href;
+                      break;
+                    }
+                  }
+                  
+                  console.log('📝 Title:', title.substring(0, 50) + '...');
+                  console.log('🔗 Link:', link);
+                  
+                  if (title && link) {
+                    // Updated snippet extraction for modern Google
+                    let content = '';
+                    const snippetSelectors = [
+                      '.VwiC3b', // Classic snippet
+                      '.s3v9rd', // Alternative snippet
+                      '.st', // Older layout
+                      '.IsZvec', // Modern Google snippet
+                      '.aCOpRe', // Featured snippet content
+                      '.hgKElc', // Another snippet class
+                      'span:not([class]):not([id])', // Generic spans
+                      'div:not([class]):not([id]) span', // Nested spans
+                    ];
+                    
+                    for (const sel of snippetSelectors) {
+                      const snippetEl = result.querySelector(sel);
+                      if (snippetEl?.textContent?.trim()) {
+                        const text = snippetEl.textContent.trim();
+                        if (text.length > 20 && text.length < 1000 && text !== title) {
+                          content = text;
+                          break;
+                        }
+                      }
+                    }
+                    
+                    // If no snippet found, try to extract from general text
+                    if (!content) {
+                      const fullText = result.textContent || '';
+                      let cleanedText = fullText.replace(title, '').trim();
+                      
+                      // Remove common Google UI elements
+                      cleanedText = cleanedText.replace(/^https?:\/\/[^\s]+/g, '');
+                      cleanedText = cleanedText.replace(/\d{4}年\d{1,2}月\d{1,2}日/g, '');
+                      cleanedText = cleanedText.replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, '');
+                      cleanedText = cleanedText.replace(/Cached/g, '');
+                      cleanedText = cleanedText.replace(/Similar/g, '');
+                      
+                      if (cleanedText.length > 30) {
+                        content = cleanedText.substring(0, 300);
+                      }
+                    }
+                    
+                    console.log('📄 Content snippet:', content.substring(0, 100) + '...');
+                    
+                    posts.push({
+                      index: index + 1,
+                      title: title,
+                      content: content,
+                      link: link,
+                      metadata: {
+                        source: new URL(link).hostname.replace('www.', '')
+                      }
+                    });
+                    console.log('✅ Added post', index + 1, 'to results');
+                  } else {
+                    console.log('❌ Skipped result', index + 1, '- missing title or link');
+                  }
+                } catch (e) {
+                  console.log('❌ Error extracting result:', e);
+                }
+              });
+              
+              const result = {
+                posts,
+                totalFound: resultElements.length,
+                pageUrl: window.location.href,
+                pageTitle: document.title,
+                platform: 'google'
+              };
+              
+              console.log('🎉 Extraction complete, returning:', result);
+              return result;
+            }
+          }
+          
+          const extractor = new GoogleExtractor();
+          if (extractor.canHandle()) {
+            return extractor.extractPosts(5);
+          } else {
+            console.log('❌ Cannot handle this page');
+            return { success: false, error: 'Not a Google search page' };
+          }
+        }
+      }, (results) => {
+        console.log('📤 chrome.scripting.executeScript callback called');
+        console.log('📊 Results:', results);
+        console.log('❌ Chrome runtime error:', chrome.runtime.lastError);
+        
+        if (chrome.runtime.lastError) {
+          console.error('❌ Chrome scripting error:', chrome.runtime.lastError.message);
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+        } else if (results && results[0]) {
+          console.log('✅ Extraction successful, result:', results[0]);
+          resolve({ success: true, ...results[0] });
+        } else {
+          console.error('❌ No results returned or invalid format');
+          console.error('❌ Full results object:', results);
+          resolve({ success: false, error: 'No results returned' });
+        }
+      });
+    });
+  }
+
+  private formatGoogleResults(extractionResult: any, query: string): string {
+    const { posts, totalFound } = extractionResult;
+    
+    let formatted = `📊 **Google Search Results for "${query}"**\n\n`;
+    formatted += `Found ${totalFound} results, showing top ${posts.length}:\n\n`;
+    
+    posts.forEach((post: any, index: number) => {
+      formatted += `**${index + 1}. ${post.title}**\n`;
+      if (post.content) {
+        formatted += `${post.content}\n`;
+      }
+      formatted += `🔗 ${post.metadata?.source || 'Unknown source'}: ${post.link}\n\n`;
+    });
+    
+    return formatted;
+  }
+
+  private async generateGoogleResultsSummary(
+    extractionResult: any,
+    query: string,
+    sendResponse: (response: ChatResponse) => void,
+    sessionId: string,
+    tabId: number | undefined
+  ): Promise<void> {
+    try {
+      console.log('🤖 generateGoogleResultsSummary: Starting AI summary generation');
+      
+      // Import LLM service dynamically
+      const { LLMService } = await import('./llm-service');
+      const llmService = LLMService.getInstance();
+      
+      // Create a prompt for summarizing Google results
+      const promptContent = this.createGoogleSummaryPrompt(extractionResult, query);
+      console.log('📝 generateGoogleResultsSummary: Created prompt, length:', promptContent.length);
+      
+      // Get AI summary
+      console.log('📤 generateGoogleResultsSummary: Calling llmService.handleChat...');
+      await llmService.handleChat({
+        text: promptContent,
+        sessionId,
+        tabId: undefined
+      }, { tab: undefined }, (aiResponse) => {
+        console.log('🎯 generateGoogleResultsSummary: AI response callback triggered');
+        console.log('📊 generateGoogleResultsSummary: AI response:', aiResponse);
+        
+        if (aiResponse && aiResponse.type === 'MESSAGE' && aiResponse.payload?.text) {
+          console.log('✅ generateGoogleResultsSummary: Valid AI response received, sending summary');
+          const summaryResponse = {
+            type: 'MESSAGE' as const,
+            payload: {
+              text: `🤖 **AI Analysis of Google Search Results:**\n\n${aiResponse.payload.text}`,
+              sessionId
+            }
+          };
+          
+          sendResponse(summaryResponse);
+          console.log('📤 generateGoogleResultsSummary: Summary response sent');
+          
+          // Also send directly to content script
+          if (tabId) {
+            chrome.tabs.sendMessage(tabId, summaryResponse).catch(() => {
+              console.log('💡 Could not send AI summary to content script (this is normal if using popup)');
+            });
+          }
+          
+          // Send summary to popup as well
+          chrome.runtime.sendMessage(summaryResponse).catch(() => {
+            console.log('💡 Could not send AI summary to popup (this is normal if popup is closed)');
+          });
+        } else {
+          console.log('❌ generateGoogleResultsSummary: Invalid AI response, sending fallback');
+          const fallbackResponse = {
+            type: 'MESSAGE' as const,
+            payload: {
+              text: `⚠️ AI analysis unavailable for these Google search results.`,
+              sessionId
+            }
+          };
+          
+          sendResponse(fallbackResponse);
+          
+          // Also send fallback directly to content script
+          if (tabId) {
+            chrome.tabs.sendMessage(tabId, fallbackResponse).catch(() => {
+              console.log('💡 Could not send fallback message to content script (this is normal if using popup)');
+            });
+          }
+          
+          // Send fallback to popup as well
+          chrome.runtime.sendMessage(fallbackResponse).catch(() => {
+            console.log('💡 Could not send fallback message to popup (this is normal if popup is closed)');
+          });
+        }
+      });
+      console.log('✅ generateGoogleResultsSummary: llmService.handleChat call completed');
+    } catch (error) {
+      console.error('❌ generateGoogleResultsSummary: Error occurred:', error);
+      console.error('Google summary generation error:', error);
+      throw error;
+    }
+  }
+
+  private createGoogleSummaryPrompt(extractionResult: any, query: string): string {
+    const { posts } = extractionResult;
+    
+    let prompt = `Please analyze and summarize these Google search results for the query "${query}":\n\n`;
+    
+    posts.forEach((post: any, index: number) => {
+      prompt += `Result ${index + 1}:\n`;
+      prompt += `Title: ${post.title}\n`;
+      prompt += `Source: ${post.metadata?.source || 'Unknown'}\n`;
+      if (post.content) {
+        prompt += `Snippet: ${post.content}\n`;
+      }
+      prompt += `URL: ${post.link}\n\n`;
+    });
+    
+    prompt += `Please provide a comprehensive summary that includes:
+1. Overview of what these results show about "${query}"
+2. Key themes and main points from the results
+3. Most relevant and useful sources
+4. Any patterns or insights you notice
+5. Recommendation on which results might be most helpful
+
+Make the summary clear and actionable for someone researching "${query}".`;
+    
+    return prompt;
   }
 } 

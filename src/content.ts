@@ -55,48 +55,58 @@ class ContentScript {
 
   private setupMessageListeners(): void {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      console.log('CONTENT: Received message:', request);
-
+      console.log('🔍 CONTENT: Received message:', request);
+      
       switch (request.type) {
         case 'EXTRACT_PAGE_INFO':
           this.handleExtractPageInfo(sendResponse);
           return true;
-
+          
         case 'EXTRACT_POSTS':
-          console.log('🔍 CONTENT: Received EXTRACT_POSTS request');
           this.handleExtractPosts(request.payload, sendResponse);
           return true;
-
+          
         case 'EXTRACT_POSTS_ASYNC':
-          console.log('🔍 CONTENT: Received EXTRACT_POSTS_ASYNC request (rate-limited)');
           this.handleExtractPostsAsync(request.payload, sendResponse);
           return true;
-
-        case 'TEST_IMAGE_EXTRACTION':
-          console.log('🔍 CONTENT: Received TEST_IMAGE_EXTRACTION request');
-          this.handleTestImageExtraction(sendResponse);
-          return true;
-
+          
         case 'CLEAR_CHAT':
           this.handleClearChat(sendResponse);
-          return false;
-
-        case 'EXECUTE_ACTION':
-          this.handleExecuteAction(request.action, sendResponse);
           return true;
-
+          
+        case 'EXECUTE_ACTION':
+          this.handleExecuteAction(request.payload, sendResponse);
+          return true;
+          
         case 'GET_PAGE_ANALYSIS':
           this.handleGetPageAnalysis(sendResponse);
-          return false;
-
+          return true;
+          
         case 'ANALYZE_SEARCH_ELEMENTS':
           this.handleAnalyzeSearchElements(sendResponse);
           return true;
-
-        default:
-          console.warn('CONTENT: Unknown message type:', request.type);
-          return false;
+          
+        case 'TEST_IMAGE_EXTRACTION':
+          this.handleTestImageExtraction(sendResponse);
+          return true;
+          
+        // Handle ongoing messages from search operations
+        case 'MESSAGE':
+          console.log('📨 CONTENT: Received ongoing MESSAGE from background');
+          if (request.payload && request.payload.text) {
+            this.chatUI.hideTypingIndicator();
+            this.chatUI.addMessageToChat({
+              id: Date.now().toString(),
+              text: request.payload.text,
+              sender: 'system',
+              timestamp: Date.now()
+            });
+          }
+          sendResponse({ received: true });
+          return true;
       }
+      
+      return false;
     });
   }
 
