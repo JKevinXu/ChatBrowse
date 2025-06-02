@@ -47,6 +47,13 @@ export class IntentDemo {
       { text: 'tell me a joke', description: 'Entertainment request' },
       { text: 'how does machine learning work?', description: 'Educational question' },
 
+      // Chinese Xiaohongshu patterns
+      { text: '用小红书搜口袋黄', description: 'Chinese Xiaohongshu search pattern' },
+      { text: '小红书搜索时尚', description: 'Chinese Xiaohongshu search alternative' },
+      { text: '去小红书搜美食', description: 'Chinese Xiaohongshu food search' },
+      { text: '总结小红书旅游帖子', description: 'Chinese Xiaohongshu summarization' },
+      { text: '提取小红书帖子', description: 'Chinese Xiaohongshu extraction' },
+
       // Edge cases - natural language variations
       { text: 'could you please search for cats on google?', description: 'Polite search request' },
       { text: 'I would like to navigate to the amazon website', description: 'Formal navigation request' },

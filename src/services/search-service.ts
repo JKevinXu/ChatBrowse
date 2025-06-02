@@ -80,7 +80,9 @@ export class SearchService {
           } else if (result.newTab) {
             successMessage = `✅ Opened Xiaohongshu search results for "${query}" in a new tab.`;
           }
-          successMessage += `\n\n📱 Browse the posts manually or switch tabs and ask me to help extract information.`;
+          successMessage += `\n\n📱 Browse the results or ask me to "summarize xiaohongshu posts about ${query}" to extract and analyze them.`;
+        } else {
+          successMessage += `\n\n📱 Browse the results manually or ask me to help extract information.`;
         }
         
         sendResponse({
@@ -100,15 +102,44 @@ export class SearchService {
         });
       }
     } catch (error) {
-      console.error(`${engine} search error:`, error);
+      console.error(`Search error for ${engine}:`, error);
       sendResponse({
         type: 'MESSAGE',
         payload: {
-          text: `❌ Error searching ${engine}: ${(error as Error).message}`,
+          text: `❌ Search failed: ${(error as Error).message}`,
           sessionId
         }
       });
     }
+  }
+
+  private async findXiaohongshuTab(): Promise<chrome.tabs.Tab | null> {
+    return new Promise((resolve) => {
+      chrome.tabs.query({}, (tabs) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error querying tabs:', chrome.runtime.lastError);
+          resolve(null);
+          return;
+        }
+        
+        // Find the most recent Xiaohongshu tab with search results
+        const xiaohongshuTabs = tabs.filter(tab => 
+          tab.url && 
+          tab.url.includes('xiaohongshu.com') && 
+          (tab.url.includes('search') || tab.url.includes('keyword'))
+        );
+        
+        if (xiaohongshuTabs.length > 0) {
+          // Return the most recently accessed tab
+          const mostRecent = xiaohongshuTabs.sort((a, b) => 
+            (b.lastAccessed || 0) - (a.lastAccessed || 0)
+          )[0];
+          resolve(mostRecent);
+        } else {
+          resolve(null);
+        }
+      });
+    });
   }
 
   private async performSearch(url: string, tabId?: number): Promise<any> {

@@ -181,9 +181,9 @@ Current Context:
 INTENT TYPES:
 1. "action_execution" - User wants to execute a previously planned action (e.g., "do it", "execute", "run it", "go ahead", "proceed")
 2. "navigation" - User wants to navigate to a URL or platform (e.g., "go to google.com", "navigate to amazon", "login to xiaohongshu")
-3. "search" - User wants to search on a specific platform (e.g., "search google for cats", "find videos about cooking on bilibili", "xiaohongshu search fashion")
-4. "xiaohongshu_summary" - User wants to summarize Xiaohongshu content (e.g., "summarize xiaohongshu posts about travel", "sum up xiaohongshu fashion posts")
-5. "xiaohongshu_extract" - User wants to extract Xiaohongshu posts (e.g., "extract xiaohongshu posts", "get posts from this page")
+3. "search" - User wants to search on a specific platform (e.g., "search google for cats", "find videos about cooking on bilibili", "xiaohongshu search fashion", "用小红书搜口袋黄", "小红书搜索时尚")
+4. "xiaohongshu_summary" - User wants to summarize Xiaohongshu content (e.g., "summarize xiaohongshu posts about travel", "sum up xiaohongshu fashion posts", "总结小红书旅游帖子")
+5. "xiaohongshu_extract" - User wants to extract Xiaohongshu posts (e.g., "extract xiaohongshu posts", "get posts from this page", "提取小红书帖子")
 6. "action_planning" - User wants to plan actions on current page (e.g., "search for something", "find products", "look for videos")
 7. "general_chat" - General conversation or questions that don't fit other categories
 
@@ -211,6 +211,7 @@ RULES:
 - for navigation intents, include "url" and/or "platform" parameters
 - for action_execution, check if context.hasStoredActionPlan is true
 - be case-insensitive but precise in classification
+- understand both English and Chinese search patterns (e.g., "用小红书搜X" = search xiaohongshu for X)
 - IMPORTANT: Return ONLY the JSON object, no markdown formatting, no \`\`\`json\`\`\` blocks`;
 
     console.log('✅ [IntentService] Prompt created successfully');
@@ -329,7 +330,7 @@ RULES:
 
     // Search patterns
     console.log('🔍 [IntentService] Checking for search keywords...');
-    const searchKeywords = ['search', 'find', 'look for'];
+    const searchKeywords = ['search', 'find', 'look for', '搜', '搜索', '查找', '找'];
     const hasSearchKeyword = searchKeywords.some(keyword => {
       const found = lowerText.includes(keyword);
       console.log(`   Keyword "${keyword}":`, found);
@@ -345,18 +346,20 @@ RULES:
       console.log('🔧 [IntentService] Detecting search engine...');
       if (lowerText.includes('google')) {
         engine = 'google';
-        query = text.replace(/google|search|for|find/gi, '').trim();
+        query = text.replace(/google|search|for|find|搜|搜索/gi, '').trim();
         console.log('   Detected Google search');
       } else if (lowerText.includes('bilibili')) {
         engine = 'bilibili';
-        query = text.replace(/bilibili|search|for|find/gi, '').trim();
+        query = text.replace(/bilibili|search|for|find|搜|搜索/gi, '').trim();
         console.log('   Detected Bilibili search');
-      } else if (lowerText.includes('xiaohongshu')) {
+      } else if (lowerText.includes('xiaohongshu') || lowerText.includes('小红书')) {
         engine = 'xiaohongshu';
-        query = text.replace(/xiaohongshu|search|for|find/gi, '').trim();
+        query = text.replace(/xiaohongshu|小红书|search|for|find|搜|搜索|用|去/gi, '').trim();
         console.log('   Detected Xiaohongshu search');
       } else {
         console.log('   Using general search engine');
+        // Clean up Chinese search terms for general search
+        query = text.replace(/search|for|find|搜|搜索/gi, '').trim();
       }
 
       console.log('🔍 [IntentService] Final search parameters:');
@@ -377,14 +380,44 @@ RULES:
     }
     console.log('⏭️ [IntentService] No search keywords found');
 
-    // Xiaohongshu specific
+    // Xiaohongshu specific (also check for Chinese patterns)
     console.log('📱 [IntentService] Checking for Xiaohongshu-specific patterns...');
-    if (lowerText.includes('xiaohongshu')) {
+    if (lowerText.includes('xiaohongshu') || lowerText.includes('小红书')) {
       console.log('✅ [IntentService] Found Xiaohongshu mention, checking specific actions...');
       
-      if (lowerText.includes('summarize') || lowerText.includes('summary')) {
+      // Check for Chinese search patterns like "用小红书搜..." or "小红书搜索..."
+      const chineseSearchPatterns = [
+        /用小红书搜(.+)/i,
+        /小红书搜索(.+)/i,
+        /小红书搜(.+)/i,
+        /在小红书搜(.+)/i,
+        /去小红书搜(.+)/i
+      ];
+      
+      for (const pattern of chineseSearchPatterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+          console.log('✅ [IntentService] Matched Chinese Xiaohongshu search pattern');
+          const extractedQuery = match[1].trim();
+          console.log('🔍 [IntentService] Extracted query from Chinese pattern:', JSON.stringify(extractedQuery));
+          
+          const result = {
+            intent: 'search' as const,
+            confidence: 0.9,
+            parameters: {
+              query: extractedQuery,
+              engine: 'xiaohongshu'
+            },
+            reasoning: 'Matched Chinese Xiaohongshu search pattern'
+          };
+          console.log('📊 [IntentService] Fallback result (Chinese xiaohongshu search):', JSON.stringify(result));
+          return result;
+        }
+      }
+      
+      if (lowerText.includes('summarize') || lowerText.includes('summary') || lowerText.includes('总结') || lowerText.includes('汇总')) {
         console.log('📋 [IntentService] Detected Xiaohongshu summarization request');
-        const queryText = text.replace(/xiaohongshu|summarize|summary/gi, '').trim();
+        const queryText = text.replace(/xiaohongshu|小红书|summarize|summary|总结|汇总/gi, '').trim();
         console.log('🔍 [IntentService] Extracted query:', JSON.stringify(queryText));
         
         const result = {
@@ -399,7 +432,7 @@ RULES:
         return result;
       }
       
-      if (lowerText.includes('extract')) {
+      if (lowerText.includes('extract') || lowerText.includes('提取')) {
         console.log('📤 [IntentService] Detected Xiaohongshu extraction request');
         const result = {
           intent: 'xiaohongshu_extract' as const,
