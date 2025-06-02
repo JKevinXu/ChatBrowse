@@ -22,6 +22,10 @@ interface StoredActionPlan {
 export class ActionService {
   private storedActionPlans = new Map<number, StoredActionPlan>();
 
+  hasStoredPlan(tabId: number): boolean {
+    return this.storedActionPlans.has(tabId);
+  }
+
   isExecutionCommand(text: string): boolean {
     const executionPhrases = ['do it', 'execute', 'run it', 'go ahead', 'proceed'];
     const lowerText = text.toLowerCase().trim();

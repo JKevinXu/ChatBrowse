@@ -186,7 +186,7 @@ export class LLMService {
     }
   }
 
-  private async isProviderAvailable(provider: LLMProvider): Promise<boolean> {
+  async isProviderAvailable(provider: LLMProvider): Promise<boolean> {
     switch (provider) {
       case 'openai':
         return await this.openaiService.initialize();
@@ -197,7 +197,7 @@ export class LLMService {
     }
   }
 
-  private async generateText(prompt: string, maxTokens: number, provider: LLMProvider): Promise<string> {
+  async generateText(prompt: string, maxTokens: number, provider: LLMProvider): Promise<string> {
     switch (provider) {
       case 'openai':
         const openaiResponse = await this.openaiService.generateText(prompt, maxTokens);

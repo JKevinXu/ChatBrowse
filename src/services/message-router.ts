@@ -5,6 +5,7 @@ import { SearchService } from './search-service';
 import { ActionService } from './action-service';
 import { ContextService } from './context-service';
 import { ExtractionService } from './extraction-service';
+import { IntentService, IntentResult } from './intent-service';
 
 // Add Chrome types with proper interface
 declare global {
@@ -28,6 +29,7 @@ export class MessageRouter {
   private actionService = new ActionService();
   private contextService = new ContextService();
   private extractionService = new ExtractionService();
+  private intentService = IntentService.getInstance();
 
   async route(
     request: any,
@@ -112,6 +114,7 @@ export class MessageRouter {
     sender: chrome.runtime.MessageSender,
     sendResponse: (response: ChatResponse) => void
   ): Promise<boolean> {
+    console.log('🎯 [MessageRouter] ===== STARTING USER MESSAGE HANDLING =====');
     console.log('🐛 DEBUG: handleUserMessage ENTERED');
     console.log('🐛 DEBUG: Payload:', payload);
     console.log('🐛 DEBUG: Sender:', sender);
@@ -123,26 +126,208 @@ export class MessageRouter {
     console.log('🐛 DEBUG: Extracted sessionId:', sessionId);
     console.log('🐛 DEBUG: TabId:', tabId);
 
+    try {
+      // Use LLM-based intent classification
+      const context = {
+        currentUrl: sender.tab?.url || payload.tabUrl,
+        hasStoredActionPlan: tabId ? this.actionService.hasStoredPlan(tabId) : false,
+        pageTitle: sender.tab?.title || payload.tabTitle
+      };
+
+      console.log('🌐 [MessageRouter] Built context for intent classification:');
+      console.log('   Current URL:', context.currentUrl);
+      console.log('   Has Stored Action Plan:', context.hasStoredActionPlan);
+      console.log('   Page Title:', context.pageTitle);
+      console.log('   Tab ID:', tabId);
+
+      console.log('🎯 [MessageRouter] Calling IntentService.classifyIntent...');
+      const intentResult: IntentResult = await this.intentService.classifyIntent(text, context);
+      console.log('✅ [MessageRouter] Intent classification completed!');
+      console.log('📊 [MessageRouter] Intent Classification Result:');
+      console.log('   Intent:', intentResult.intent);
+      console.log('   Confidence:', intentResult.confidence);
+      console.log('   Parameters:', JSON.stringify(intentResult.parameters));
+      console.log('   Reasoning:', intentResult.reasoning);
+
+      // Route based on classified intent
+      console.log('🚦 [MessageRouter] Starting intent-based routing...');
+      console.log(`🎯 [MessageRouter] Routing to intent: ${intentResult.intent}`);
+
+      switch (intentResult.intent) {
+        case 'action_execution':
+          console.log('⚡ [MessageRouter] CASE: action_execution');
+          if (tabId) {
+            console.log('✅ [MessageRouter] Tab ID available, executing stored plan');
+            console.log('🐛 DEBUG: Routing to action execution');
+            await this.actionService.executeStoredPlan(tabId, sendResponse, sessionId);
+            console.log('🎉 [MessageRouter] Action execution completed successfully');
+            return true;
+          } else {
+            console.log('❌ [MessageRouter] No tab ID available for action execution');
+            console.log('🔄 [MessageRouter] Falling through to general chat');
+          }
+          break;
+
+        case 'navigation':
+          console.log('🧭 [MessageRouter] CASE: navigation');
+          console.log('🐛 DEBUG: Routing to navigation');
+          console.log('🔧 [MessageRouter] Calling navigation service with text:', JSON.stringify(text));
+          await this.navigationService.handleNavigation(text, tabId, sendResponse, sessionId);
+          console.log('🎉 [MessageRouter] Navigation completed successfully');
+          return true;
+
+        case 'search':
+          console.log('🔍 [MessageRouter] CASE: search');
+          console.log('🐛 DEBUG: Routing to search');
+          
+          if (intentResult.parameters?.engine && intentResult.parameters?.query) {
+            console.log('✅ [MessageRouter] Using LLM-extracted search parameters');
+            const searchCommand = {
+              query: intentResult.parameters.query,
+              engine: intentResult.parameters.engine
+            };
+            console.log('🔧 [MessageRouter] Search command from LLM:', JSON.stringify(searchCommand));
+            await this.searchService.handleSearch(searchCommand, tabId, sendResponse, sessionId);
+            console.log('🎉 [MessageRouter] LLM-based search completed successfully');
+            return true;
+          }
+          
+          // Fallback to original parsing
+          console.log('⚠️ [MessageRouter] LLM parameters incomplete, falling back to legacy parsing');
+          const searchResult = this.searchService.parseSearchCommand(text);
+          console.log('🔧 [MessageRouter] Legacy search result:', JSON.stringify(searchResult));
+          
+          if (searchResult) {
+            console.log('✅ [MessageRouter] Legacy parsing successful, executing search');
+            await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId);
+            console.log('🎉 [MessageRouter] Legacy search completed successfully');
+            return true;
+          } else {
+            console.log('❌ [MessageRouter] Legacy parsing also failed');
+            console.log('🔄 [MessageRouter] Falling through to general chat');
+          }
+          break;
+
+        case 'xiaohongshu_summary':
+          console.log('📱 [MessageRouter] CASE: xiaohongshu_summary');
+          console.log('🐛 DEBUG: Routing to Xiaohongshu summary');
+          
+          const xiaohongshuSummaryQuery = intentResult.parameters?.query || 
+            this.parseXiaohongshuSummaryCommand(text);
+          console.log('🔍 [MessageRouter] Xiaohongshu summary query:', JSON.stringify(xiaohongshuSummaryQuery));
+          
+          if (xiaohongshuSummaryQuery) {
+            console.log('✅ [MessageRouter] Query available, starting Xiaohongshu summarization');
+            await this.handleXiaohongshuSummarization({ 
+              query: xiaohongshuSummaryQuery, 
+              tabId, 
+              sessionId 
+            }, sender, sendResponse);
+            console.log('🎉 [MessageRouter] Xiaohongshu summarization completed successfully');
+            return true;
+          } else {
+            console.log('❌ [MessageRouter] No query available for Xiaohongshu summarization');
+            console.log('🔄 [MessageRouter] Falling through to general chat');
+          }
+          break;
+
+        case 'xiaohongshu_extract':
+          console.log('📤 [MessageRouter] CASE: xiaohongshu_extract');
+          console.log('🐛 DEBUG: Routing to Xiaohongshu extraction');
+          console.log('🔧 [MessageRouter] Calling extraction service...');
+          await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId, true);
+          console.log('🎉 [MessageRouter] Xiaohongshu extraction completed successfully');
+          return true;
+
+        case 'action_planning':
+          console.log('⚡ [MessageRouter] CASE: action_planning');
+          if (tabId) {
+            console.log('✅ [MessageRouter] Tab ID available, starting action planning');
+            console.log('🐛 DEBUG: Routing to action planning');
+            console.log('🔧 [MessageRouter] Calling action service with text:', JSON.stringify(text));
+            await this.actionService.planActions(text, tabId, sendResponse, sessionId);
+            console.log('🎉 [MessageRouter] Action planning completed successfully');
+            return true;
+          } else {
+            console.log('❌ [MessageRouter] No tab ID available for action planning');
+            console.log('🔄 [MessageRouter] Falling through to general chat');
+          }
+          break;
+
+        case 'general_chat':
+        default:
+          console.log('💬 [MessageRouter] CASE: general_chat (or default)');
+          console.log('🐛 DEBUG: Routing to general chat');
+          
+          // Add intent confidence info to the response if it's low
+          if (intentResult.confidence < 0.7) {
+            console.log(`⚠️ [MessageRouter] Low confidence intent detected!`);
+            console.log(`   Confidence: ${intentResult.confidence}`);
+            console.log(`   Reasoning: ${intentResult.reasoning}`);
+            console.log('🤔 [MessageRouter] This might indicate an ambiguous user request');
+          } else {
+            console.log('✅ [MessageRouter] High confidence general chat classification');
+          }
+          
+          console.log('🔧 [MessageRouter] Calling LLM service for general chat...');
+          await this.llmService.handleChat(payload, sender, sendResponse);
+          console.log('🎉 [MessageRouter] General chat completed successfully');
+          return true;
+      }
+
+      // If we reach here, something went wrong with routing
+      console.log('⚠️ [MessageRouter] Reached fallback section - intent routing failed');
+      console.log('🔄 [MessageRouter] This should not happen normally');
+      console.log('💬 [MessageRouter] Falling back to general chat as safety net');
+      await this.llmService.handleChat(payload, sender, sendResponse);
+      console.log('🎉 [MessageRouter] Fallback general chat completed');
+      return true;
+
+    } catch (error) {
+      console.error('❌ [MessageRouter] Intent classification failed with error:', error);
+      console.error('🔍 [MessageRouter] Error details:', {
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+        name: (error as Error).name
+      });
+      console.log('🔄 [MessageRouter] Falling back to legacy rule-based routing');
+      
+      // Fallback to legacy rule-based routing
+      const legacyResult = await this.handleUserMessageLegacy(payload, sender, sendResponse);
+      console.log('📊 [MessageRouter] Legacy routing result:', legacyResult);
+      return legacyResult;
+    } finally {
+      console.log('🎯 [MessageRouter] ===== FINISHED USER MESSAGE HANDLING =====');
+    }
+  }
+
+  // Legacy fallback method (keeping the original logic as backup)
+  private async handleUserMessageLegacy(
+    payload: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response: ChatResponse) => void
+  ): Promise<boolean> {
+    const { text, sessionId } = payload;
+    const tabId = sender.tab?.id || payload.tabId;
+
     // Check for action execution commands first (like "do it")
     if (this.actionService.isExecutionCommand(text) && tabId) {
-      console.log('🐛 DEBUG: Action execution command detected');
+      console.log('🐛 DEBUG: Legacy - Action execution command detected');
       await this.actionService.executeStoredPlan(tabId, sendResponse, sessionId);
       return true;
     }
 
     // Check for navigation commands
     if (this.navigationService.isNavigationCommand(text)) {
-      console.log('🐛 DEBUG: Navigation command detected');
+      console.log('🐛 DEBUG: Legacy - Navigation command detected');
       await this.navigationService.handleNavigation(text, tabId, sendResponse, sessionId);
       return true;
     }
 
     // Check for Xiaohongshu search and summarize commands
-    console.log('🐛 DEBUG: About to check Xiaohongshu summary command');
     const xiaohongshuSummaryQuery = this.parseXiaohongshuSummaryCommand(text);
-    console.log('🐛 DEBUG: Xiaohongshu summary query result:', xiaohongshuSummaryQuery);
     if (xiaohongshuSummaryQuery) {
-      console.log('🐛 DEBUG: Xiaohongshu summary command matched, calling handler');
+      console.log('🐛 DEBUG: Legacy - Xiaohongshu summary command matched');
       await this.handleXiaohongshuSummarization({ 
         query: xiaohongshuSummaryQuery, 
         tabId, 
@@ -154,27 +339,27 @@ export class MessageRouter {
     // Check for search commands BEFORE general action requests
     const searchResult = this.searchService.parseSearchCommand(text);
     if (searchResult) {
-      console.log('🐛 DEBUG: General search command detected');
+      console.log('🐛 DEBUG: Legacy - General search command detected');
       await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId);
       return true;
     }
 
     // Check for Xiaohongshu post extraction
     if (text.toLowerCase().includes('extract') && text.toLowerCase().includes('xiaohongshu')) {
-      console.log('🐛 DEBUG: Xiaohongshu extract command detected');
+      console.log('🐛 DEBUG: Legacy - Xiaohongshu extract command detected');
       await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId, true);
       return true;
     }
 
     // Check for action planning requests (after specific commands)
     if (this.actionService.isActionRequest(text) && tabId) {
-      console.log('🐛 DEBUG: Action planning request detected');
+      console.log('🐛 DEBUG: Legacy - Action planning request detected');
       await this.actionService.planActions(text, tabId, sendResponse, sessionId);
       return true;
     }
 
     // Handle general AI chat
-    console.log('🐛 DEBUG: Falling back to general AI chat');
+    console.log('🐛 DEBUG: Legacy - Falling back to general AI chat');
     await this.llmService.handleChat(payload, sender, sendResponse);
     return true;
   }
