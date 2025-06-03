@@ -67,6 +67,15 @@ export class LLMService {
       const fallbackPageInfo = this.createFallbackPageInfo(sender, tabUrl, tabTitle);
       const finalPageInfo = pageInfo || fallbackPageInfo;
 
+      // Debug logging for page context
+      console.log('🔍 [DEBUG] Page context retrieval:');
+      console.log('  - tabId:', tabId);
+      console.log('  - pageInfo from contextService:', pageInfo);
+      console.log('  - fallbackPageInfo:', fallbackPageInfo);
+      console.log('  - finalPageInfo:', finalPageInfo);
+      console.log('  - finalPageInfo.content exists:', !!finalPageInfo?.content);
+      console.log('  - finalPageInfo.content length:', finalPageInfo?.content?.length || 0);
+
       // Check if this is a summarize request
       const isSummarizeRequest = this.isSummarizeRequest(text);
 
@@ -221,6 +230,12 @@ export class LLMService {
     const systemPrompt = this.createSystemPrompt(pageInfo, tabId, isSummarizeRequest);
     const fullPrompt = `${systemPrompt}\n\nUser: ${text}\n\nAssistant:`;
     
+    // Log the final prompt being sent to LLM
+    console.log('🤖 [LLM REQUEST] Final prompt being sent to AI:');
+    console.log('==========================================');
+    console.log(fullPrompt);
+    console.log('==========================================');
+    
     const responseText = await this.generateText(fullPrompt, 1000, provider);
 
     return {
@@ -233,20 +248,33 @@ export class LLMService {
   }
 
   private createSystemPrompt(pageInfo: any, tabId: number | undefined, isSummarizeRequest: boolean): string {
+    // Debug logging for pageInfo
+    console.log('🔍 [DEBUG] createSystemPrompt called with:');
+    console.log('  - tabId:', tabId);
+    console.log('  - isSummarizeRequest:', isSummarizeRequest);
+    console.log('  - pageInfo:', pageInfo);
+    console.log('  - pageInfo.content exists:', !!pageInfo?.content);
+    console.log('  - pageInfo.content length:', pageInfo?.content?.length || 0);
+    if (pageInfo?.content) {
+      console.log('  - pageInfo.content preview:', pageInfo.content.substring(0, 200) + '...');
+    }
+
     const basePrompt = isSummarizeRequest 
       ? "You are a helpful assistant that summarizes web page content clearly and concisely."
       : "You are a helpful assistant that can help users navigate websites and answer questions about web pages.";
 
     if (pageInfo && pageInfo.content) {
+      console.log('✅ [DEBUG] Using pageInfo.content in system prompt');
       return `${basePrompt} You have access to the current page content:
       
 URL: ${pageInfo.url}
 Title: ${pageInfo.title}
-Content: ${pageInfo.content.substring(0, 3000)}...
+Content: ${pageInfo.content}
 
 Use this context to provide helpful and accurate responses.`;
     }
 
+    console.log('⚠️ [DEBUG] No pageInfo.content available, using fallback prompt');
     return `${basePrompt} You can help users navigate websites and provide information about the current page at ${pageInfo?.url || 'this website'}.`;
   }
 

@@ -17,12 +17,12 @@ class ContentScript {
     this.chatUI = new ChatUI((message) => this.handleUserMessage(message));
   }
 
-  initialize(): void {
+  async initialize(): Promise<void> {
     console.log('ChatBrowse content script initializing...');
     
     try {
       // Extract page info and create session
-      const pageInfo = extractPageInfo();
+      const pageInfo = await extractPageInfo();
       const { title, url } = pageInfo;
       
       console.log('DEBUG: Initial page info extraction results:');
@@ -56,11 +56,26 @@ class ContentScript {
   private setupMessageListeners(): void {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.log('🔍 CONTENT: Received message:', request);
+      console.log('🔍 CONTENT: Message type:', request.type);
+      console.log('🔍 CONTENT: Sender:', sender);
       
       switch (request.type) {
         case 'EXTRACT_PAGE_INFO':
-          this.handleExtractPageInfo(sendResponse);
-          return true;
+          console.log('🎯 CONTENT: Handling EXTRACT_PAGE_INFO message');
+          // Handle async response properly
+          (async () => {
+            try {
+              await this.handleExtractPageInfo(sendResponse);
+            } catch (error) {
+              console.error('❌ [CONTENT] Error in handleExtractPageInfo:', error);
+              sendResponse({
+                title: document.title || 'Unknown Title',
+                url: window.location.href || 'Unknown URL',
+                content: `Error: ${(error as Error).message}`
+              });
+            }
+          })();
+          return true; // Keep the channel open for async response
           
         case 'EXTRACT_POSTS':
           this.handleExtractPosts(request.payload, sendResponse);
@@ -182,23 +197,33 @@ class ContentScript {
     );
   }
 
-  private handleSetContextCommand(args: string): void {
-    const pageInfo = extractPageInfo();
-    const useAsContext = args === 'on';
-    
-    chrome.runtime.sendMessage({
-      type: 'SET_CONTEXT',
-      payload: { ...pageInfo, useAsContext }
-    }, (response) => {
-      if (response && response.payload) {
-        this.chatUI.addMessageToChat({
-          id: Date.now().toString(),
-          text: response.payload.text,
-          sender: 'system',
-          timestamp: Date.now()
-        });
-      }
-    });
+  private async handleSetContextCommand(args: string): Promise<void> {
+    try {
+      const pageInfo = await extractPageInfo();
+      const useAsContext = args === 'on';
+      
+      chrome.runtime.sendMessage({
+        type: 'SET_CONTEXT',
+        payload: { ...pageInfo, useAsContext }
+      }, (response) => {
+        if (response && response.payload) {
+          this.chatUI.addMessageToChat({
+            id: Date.now().toString(),
+            text: response.payload.text,
+            sender: 'system',
+            timestamp: Date.now()
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error extracting page info for context:', error);
+      this.chatUI.addMessageToChat({
+        id: Date.now().toString(),
+        text: `Error setting context: ${(error as Error).message}`,
+        sender: 'system',
+        timestamp: Date.now()
+      });
+    }
   }
 
   private handleChatCommand(text: string): void {
@@ -234,9 +259,32 @@ class ContentScript {
   }
 
   // Message handlers for background script requests
-  private handleExtractPageInfo(sendResponse: (response: any) => void): void {
-    const pageInfo = extractPageInfo();
-    sendResponse(pageInfo);
+  private async handleExtractPageInfo(sendResponse: (response: any) => void): Promise<void> {
+    console.log('📥 [CONTENT] Received EXTRACT_PAGE_INFO message, starting extraction...');
+    
+    try {
+      const pageInfo = await extractPageInfo();
+      console.log('✅ [CONTENT] Page extraction completed successfully:', {
+        title: pageInfo.title,
+        url: pageInfo.url,
+        contentLength: pageInfo.content.length,
+        hasContent: !!pageInfo.content
+      });
+      console.log('📤 [CONTENT] Sending page info response to background...');
+      console.log('📄 [CONTENT] Full page info being sent:', pageInfo);
+      
+      // Send the response
+      sendResponse(pageInfo);
+    } catch (error) {
+      console.error('❌ [CONTENT] Error extracting page info:', error);
+      const errorResponse = {
+        title: document.title || 'Unknown Title',
+        url: window.location.href || 'Unknown URL',
+        content: `Failed to extract page info: ${(error as Error).message}`
+      };
+      console.log('📤 [CONTENT] Sending error response to background:', errorResponse);
+      sendResponse(errorResponse);
+    }
   }
 
   private handleExtractPosts(payload: any, sendResponse: (response: any) => void): void {
