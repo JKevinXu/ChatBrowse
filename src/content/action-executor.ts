@@ -87,11 +87,31 @@ export class ActionExecutor {
           return { success: false, error: 'No element found at coordinates' };
         }
       } else if (selector) {
-        // Click by selector
-        const element = document.querySelector(selector) as HTMLElement;
+        // Try to find element by selector, with fallbacks for text-based matching
+        let element = this.findElementBySelector(selector);
+        
         if (element) {
-          element.click();
-          return { success: true, data: { selector } };
+          console.log('🔍 [ActionExecutor] Found element, attempting click:', element);
+          console.log('🔍 [ActionExecutor] Element details:', {
+            tagName: element.tagName,
+            className: element.className,
+            id: element.id,
+            attributes: Array.from(element.attributes).map(attr => `${attr.name}="${attr.value}"`),
+            disabled: element.hasAttribute('disabled'),
+            hidden: element.hidden,
+            offsetWidth: element.offsetWidth,
+            offsetHeight: element.offsetHeight,
+            clientRect: element.getBoundingClientRect()
+          });
+          
+          // Try multiple click methods for custom web components
+          const clickSuccess = this.tryMultipleClickMethods(element);
+          
+          if (clickSuccess) {
+            return { success: true, data: { selector, element: element.tagName } };
+          } else {
+            return { success: false, error: `Element found but click may not have triggered: ${selector}` };
+          }
         } else {
           return { success: false, error: `Element not found: ${selector}` };
         }
@@ -101,6 +121,117 @@ export class ActionExecutor {
     } catch (error) {
       return { success: false, error: `Click failed: ${(error as Error).message}` };
     }
+  }
+
+  private tryMultipleClickMethods(element: HTMLElement): boolean {
+    console.log('🔍 [ActionExecutor] Trying click on:', element);
+    
+    try {
+      // Use simple click approach (like manual test that works)
+      console.log('🔍 [ActionExecutor] Executing single click()');
+      element.click();
+      
+      console.log('✅ [ActionExecutor] Click executed successfully');
+      return true;
+      
+    } catch (error) {
+      console.log('❌ [ActionExecutor] Error in click:', error);
+      return false;
+    }
+  }
+
+  private findElementBySelector(selector: string): HTMLElement | null {
+    console.log('🔍 [ActionExecutor] Looking for element with selector:', selector);
+    
+    // Split by commas to handle multiple selectors
+    const selectors = selector.split(',').map(s => s.trim());
+    console.log('🔍 [ActionExecutor] Split selectors:', selectors);
+    
+    for (const sel of selectors) {
+      console.log('🔍 [ActionExecutor] Trying selector:', sel);
+      
+      // Handle text-based selectors like "button:contains('text')"
+      if (sel.includes(':contains(')) {
+        console.log('🔍 [ActionExecutor] Using text-based matching for:', sel);
+        const element = this.findElementByText(sel);
+        if (element) {
+          console.log('✅ [ActionExecutor] Found element via text matching:', element);
+          return element;
+        }
+        continue;
+      }
+      
+      // Regular DOM query
+      let element = document.querySelector(sel) as HTMLElement;
+      if (element) {
+        console.log('✅ [ActionExecutor] Found element via regular query:', element);
+        
+        // Special handling for kat-dropdown-button shadow DOM
+        if (element.tagName.toLowerCase() === 'kat-dropdown-button') {
+          console.log('🔍 [ActionExecutor] Found kat-dropdown-button, checking shadow DOM...');
+          const shadowButton = this.findButtonInShadowDOM(element);
+          if (shadowButton) {
+            console.log('✅ [ActionExecutor] Found button in shadow DOM:', shadowButton);
+            return shadowButton;
+          } else {
+            console.log('⚠️ [ActionExecutor] No shadow DOM button found, using component directly');
+            return element;
+          }
+        }
+        
+        return element;
+      }
+    }
+    
+    console.log('❌ [ActionExecutor] No element found with any selector');
+    return null;
+  }
+
+  private findButtonInShadowDOM(katButton: HTMLElement): HTMLElement | null {
+    try {
+      // Check if the element has shadow root
+      const shadowRoot = (katButton as any).shadowRoot;
+      if (!shadowRoot) {
+        console.log('⚠️ [ActionExecutor] No shadow root found on kat-dropdown-button');
+        return null;
+      }
+      
+      console.log('🔍 [ActionExecutor] Searching in shadow DOM...');
+      
+      // Look for the actual button inside shadow DOM
+      const shadowButton = shadowRoot.querySelector('button[part="dropdown-button-toggle-button"]') ||
+                          shadowRoot.querySelector('button.indicator') ||
+                          shadowRoot.querySelector('button[aria-label="open dropdown"]') ||
+                          shadowRoot.querySelector('button');
+      
+      if (shadowButton) {
+        console.log('✅ [ActionExecutor] Found button in shadow DOM:', shadowButton);
+        return shadowButton as HTMLElement;
+      } else {
+        console.log('❌ [ActionExecutor] No button found in shadow DOM');
+        return null;
+      }
+    } catch (error) {
+      console.log('❌ [ActionExecutor] Error accessing shadow DOM:', error);
+      return null;
+    }
+  }
+
+  private findElementByText(selector: string): HTMLElement | null {
+    // Parse selector like "button:contains('Bulk actions')"
+    const match = selector.match(/(.+):contains\(['"]?([^'"]+)['"]?\)/);
+    if (!match) return null;
+    
+    const [, tagSelector, text] = match;
+    const elements = document.querySelectorAll(tagSelector);
+    
+    for (const element of Array.from(elements)) {
+      if (element.textContent?.toLowerCase().includes(text.toLowerCase())) {
+        return element as HTMLElement;
+      }
+    }
+    
+    return null;
   }
 
   private async typeText(selector?: string, text?: string): Promise<BrowserActionResult> {
@@ -310,6 +441,9 @@ export class ActionExecutor {
   }
 
   private async executeClickAction(action: ActionPlan): Promise<BrowserActionResult> {
-    return this.clickElement(action.selector);
+    console.log('🔍 [ActionExecutor] Starting click action:', action);
+    const result = await this.clickElement(action.selector);
+    console.log('🔍 [ActionExecutor] Click action result:', result);
+    return result;
   }
 } 

@@ -33,7 +33,7 @@ export class ActionService {
   }
 
   isActionRequest(text: string): boolean {
-    const actionKeywords = ['search', 'find', 'look for', 'videos about'];
+    const actionKeywords = ['search', 'find', 'look for', 'videos about', 'bulk actions', 'bulk action', 'click bulk', 'open bulk'];
     const lowerText = text.toLowerCase().trim();
     return actionKeywords.some(keyword => lowerText.includes(keyword));
   }
@@ -169,6 +169,14 @@ export class ActionService {
   }
 
   private createSimpleActionPlan(text: string, pageInfo: any): ActionPlan[] {
+    const lowerText = text.toLowerCase();
+    
+    // Check for bulk actions requests
+    if (this.isBulkActionsRequest(lowerText)) {
+      return this.createBulkActionsPlans(lowerText);
+    }
+    
+    // Existing search functionality
     const searchTerm = this.extractSearchTerm(text);
     const platform = this.detectPlatform(pageInfo.url);
     const selector = this.getSearchSelector(platform);
@@ -180,6 +188,45 @@ export class ActionService {
       description: `Search ${platform} for "${searchTerm}"`,
       confidence: 0.8
     }];
+  }
+
+  private isBulkActionsRequest(text: string): boolean {
+    const bulkActionPatterns = [
+      /click bulk actions?/i,
+      /open bulk actions?/i,
+      /bulk actions? button/i,
+      /select bulk actions?/i,
+      /click the bulk/i,
+      /open the bulk/i,
+      /access bulk actions?/i,
+      /show bulk actions?/i
+    ];
+    
+    return bulkActionPatterns.some(pattern => pattern.test(text));
+  }
+
+  private createBulkActionsPlans(text: string): ActionPlan[] {
+    const plans: ActionPlan[] = [];
+    
+    // First, click the bulk actions button - prioritize kat-dropdown-button since we handle shadow DOM
+    plans.push({
+      type: 'click',
+      selector: 'kat-dropdown-button[data-testid="bulk_actions_button"], button[part="dropdown-button-toggle-button"], button.indicator, button[aria-label="open dropdown"], [data-testid="bulk_actions_button"]',
+      description: 'Click the bulk actions button',
+      confidence: 0.9
+    });
+
+    // If the request mentions download, add that as a follow-up action
+    if (text.includes('download') || text.includes('export')) {
+      plans.push({
+        type: 'click',
+        selector: 'kat-menu-item[data-action="download"], [data-testid="download"], [data-action="download"], [role="menuitem"]:contains("Download"), button:contains("Download")',
+        description: 'Click download option',
+        confidence: 0.8
+      });
+    }
+
+    return plans;
   }
 
   private extractSearchTerm(text: string): string {

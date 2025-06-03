@@ -184,8 +184,10 @@ INTENT TYPES:
 3. "search" - User wants to search on a specific platform (e.g., "search google for cats", "find videos about cooking on bilibili", "xiaohongshu search fashion", "用小红书搜口袋黄", "小红书搜索时尚")
 4. "xiaohongshu_summary" - User wants to summarize Xiaohongshu content (e.g., "summarize xiaohongshu posts about travel", "sum up xiaohongshu fashion posts", "总结小红书旅游帖子")
 5. "xiaohongshu_extract" - User wants to extract Xiaohongshu posts (e.g., "extract xiaohongshu posts", "get posts from this page", "提取小红书帖子")
-6. "action_planning" - User wants to plan actions on current page (e.g., "search for something", "find products", "look for videos")
+6. "action_planning" - User wants to plan actions on current page (e.g., "search for something", "find products", "look for videos", "click bulk actions", "download data", "select items", "click button")
 7. "general_chat" - General conversation or questions that don't fit other categories
+
+IMPORTANT: "action_planning" is for NEW actions the user wants to perform (like clicking buttons, downloading, selecting items), while "action_execution" is ONLY for executing previously stored plans.
 
 ${contextInfo}
 
@@ -451,7 +453,7 @@ RULES:
 
     // Action planning
     console.log('⚡ [IntentService] Checking for action planning keywords...');
-    const actionKeywords = ['search', 'find', 'look for', 'videos about'];
+    const actionKeywords = ['search', 'find', 'look for', 'videos about', 'click', 'bulk', 'actions', 'button', 'download', 'export', 'select'];
     const hasActionKeyword = actionKeywords.some(keyword => {
       const found = lowerText.includes(keyword);
       console.log(`   Action keyword "${keyword}":`, found);

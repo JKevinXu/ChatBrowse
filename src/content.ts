@@ -90,7 +90,7 @@ class ContentScript {
           return true;
           
         case 'EXECUTE_ACTION':
-          this.handleExecuteAction(request.payload, sendResponse);
+          this.handleExecuteAction(request.action, sendResponse);
           return true;
           
         case 'GET_PAGE_ANALYSIS':
@@ -554,8 +554,16 @@ if (window.location.protocol === 'chrome-extension:') {
   document.addEventListener('DOMContentLoaded', () => {
     const contentScript = new ContentScript();
     contentScript.initialize();
+    
+    // Set global variable for detection
+    (window as any).chatBrowseContentScript = true;
+    console.log('✅ ChatBrowse content script loaded and global variable set');
   });
 } else {
   const contentScript = new ContentScript();
   contentScript.initialize();
+  
+  // Set global variable for detection
+  (window as any).chatBrowseContentScript = true;
+  console.log('✅ ChatBrowse content script loaded and global variable set');
 } 
