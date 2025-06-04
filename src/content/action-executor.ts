@@ -147,7 +147,62 @@ export class ActionExecutor {
       }
     }
     
+    // If no element found with standard selectors, try looking in shadow DOM for dropdown menu items
+    console.log('🔍 [ActionExecutor] Standard selectors failed, checking shadow DOM for menu items...');
+    const shadowElement = this.findElementInAnyShadowDOM(selectors);
+    if (shadowElement) {
+      console.log('✅ [ActionExecutor] Found element in shadow DOM');
+      return shadowElement;
+    }
+    
     console.log('❌ [ActionExecutor] No element found');
+    return null;
+  }
+
+  /**
+   * Searches for dropdown menu items inside any shadow DOM on the page
+   */
+  private findElementInAnyShadowDOM(selectors: string[]): HTMLElement | null {
+    // Look for all custom components that might have shadow DOM
+    const customComponents = document.querySelectorAll('kat-dropdown-button, kat-menu, kat-dropdown');
+    
+    for (const component of Array.from(customComponents)) {
+      try {
+        const shadowRoot = (component as any).shadowRoot;
+        if (!shadowRoot) continue;
+        
+        console.log('🔍 [ActionExecutor] Searching shadow DOM of:', component.tagName);
+        
+        // Try each selector in the shadow DOM
+        for (const selector of selectors) {
+          if (selector.includes(':contains(')) {
+            // Handle text-based matching in shadow DOM
+            const textMatch = selector.match(/(.+):contains\(['"]?([^'"]+)['"]?\)/);
+            if (textMatch) {
+              const [, tagSelector, text] = textMatch;
+              const elements = shadowRoot.querySelectorAll(tagSelector);
+              for (const el of Array.from(elements)) {
+                const element = el as HTMLElement;
+                if (element.textContent?.toLowerCase().includes(text.toLowerCase())) {
+                  console.log('✅ [ActionExecutor] Found via shadow DOM text matching:', text);
+                  return element;
+                }
+              }
+            }
+          } else {
+            // Standard selector in shadow DOM
+            const element = shadowRoot.querySelector(selector) as HTMLElement;
+            if (element) {
+              console.log('✅ [ActionExecutor] Found via shadow DOM selector:', selector);
+              return element;
+            }
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ [ActionExecutor] Error searching shadow DOM:', error);
+      }
+    }
+    
     return null;
   }
 
@@ -410,9 +465,17 @@ export class ActionExecutor {
   }
 
   private async executeClickAction(action: ActionPlan): Promise<BrowserActionResult> {
-    console.log('🔍 [ActionExecutor] Starting click action:', action);
+    console.log('🔍 [ActionExecutor] Starting click action:', action.description);
+    
+    // Add delay for dropdown menu items to ensure they're available
+    if (action.description.toLowerCase().includes('download') && 
+        action.description.toLowerCase().includes('option')) {
+      console.log('⏱️ [ActionExecutor] Adding delay for dropdown menu item...');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay for dropdown to open
+    }
+    
     const result = await this.clickElement(action.selector);
-    console.log('🔍 [ActionExecutor] Click action result:', result);
+    console.log('🔍 [ActionExecutor] Click action result:', result.success ? '✅ Success' : '❌ Failed');
     return result;
   }
 } 

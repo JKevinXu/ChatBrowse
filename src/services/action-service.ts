@@ -125,12 +125,22 @@ export class ActionService {
       // Execute actions one by one
       const results: ActionResult[] = [];
       
-      for (const action of stored.plans) {
+      for (let i = 0; i < stored.plans.length; i++) {
+        const action = stored.plans[i];
+        console.log(`🎯 [ActionService] Executing action ${i + 1}/${stored.plans.length}: ${action.description}`);
+        
         const result = await this.executeAction(tabId, action);
         results.push(result);
         
-        // Small delay between actions
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Add appropriate delay between actions
+        if (i < stored.plans.length - 1) {
+          const nextAction = stored.plans[i + 1];
+          // Longer delay if next action is a dropdown menu item
+          const delay = (nextAction.description.toLowerCase().includes('download') && 
+                        nextAction.description.toLowerCase().includes('option')) ? 1500 : 500;
+          console.log(`⏱️ [ActionService] Waiting ${delay}ms before next action...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
       
       // Generate summary
@@ -202,7 +212,10 @@ export class ActionService {
       /click the bulk/i,
       /open the bulk/i,
       /access bulk actions?/i,
-      /show bulk actions?/i
+      /show bulk actions?/i,
+      /bulk actions? download/i,
+      /download all/i,
+      /bulk download/i
     ];
     
     return bulkActionPatterns.some(pattern => pattern.test(text));
@@ -223,12 +236,30 @@ export class ActionService {
       confidence: 0.9
     });
 
-    // Optional follow-up action for download requests
-    if (text.includes('download') || text.includes('export')) {
+    // Enhanced download detection - check for "download all" or "all" specifically
+    const lowerText = text.toLowerCase();
+    const isDownloadAllRequest = lowerText.includes('download all') || 
+                                lowerText.includes('download everything') ||
+                                (lowerText.includes('download') && lowerText.includes('all')) ||
+                                lowerText.includes('bulk download');
+    
+    const isDownloadSelectedRequest = (lowerText.includes('download') || lowerText.includes('export')) && 
+                                     !isDownloadAllRequest;
+
+    if (isDownloadAllRequest) {
+      // Add Download All action with a small delay to let dropdown open
       plans.push({
         type: 'click',
-        selector: 'kat-menu-item[data-action="download"], [data-testid="download"], [data-action="download"], [role="menuitem"]:contains("Download"), button:contains("Download")',
-        description: 'Click download option',
+        selector: 'button[data-action="downloadAll"], button[part="dropdown-button-button-2"], [role="menuitem"]:contains("Download All"), button:contains("Download All")',
+        description: 'Click Download All option',
+        confidence: 0.85
+      });
+    } else if (isDownloadSelectedRequest) {
+      // Add Download Selected action for other download requests
+      plans.push({
+        type: 'click',
+        selector: 'button[data-action="downloadSelected"], [role="menuitem"]:contains("Download Selected"), button:contains("Download Selected"), kat-menu-item[data-action="download"]',
+        description: 'Click Download Selected option',
         confidence: 0.8
       });
     }
