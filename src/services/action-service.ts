@@ -190,6 +190,9 @@ export class ActionService {
     }];
   }
 
+  /**
+   * Detects if the user's input is requesting bulk actions functionality
+   */
   private isBulkActionsRequest(text: string): boolean {
     const bulkActionPatterns = [
       /click bulk actions?/i,
@@ -205,18 +208,22 @@ export class ActionService {
     return bulkActionPatterns.some(pattern => pattern.test(text));
   }
 
+  /**
+   * Creates action plans for bulk actions functionality
+   */
   private createBulkActionsPlans(text: string): ActionPlan[] {
     const plans: ActionPlan[] = [];
     
-    // First, click the bulk actions button - prioritize kat-dropdown-button since we handle shadow DOM
+    // Primary action: click the bulk actions button
+    // Prioritize kat-dropdown-button since we handle shadow DOM
     plans.push({
       type: 'click',
-      selector: 'kat-dropdown-button[data-testid="bulk_actions_button"], button[part="dropdown-button-toggle-button"], button.indicator, button[aria-label="open dropdown"], [data-testid="bulk_actions_button"]',
+      selector: 'kat-dropdown-button[data-testid="bulk_actions_button"], button[part="dropdown-button-toggle-button"], button.indicator, button[aria-label*="dropdown"], [data-testid="bulk_actions_button"]',
       description: 'Click the bulk actions button',
       confidence: 0.9
     });
 
-    // If the request mentions download, add that as a follow-up action
+    // Optional follow-up action for download requests
     if (text.includes('download') || text.includes('export')) {
       plans.push({
         type: 'click',

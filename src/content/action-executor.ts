@@ -87,30 +87,17 @@ export class ActionExecutor {
           return { success: false, error: 'No element found at coordinates' };
         }
       } else if (selector) {
-        // Try to find element by selector, with fallbacks for text-based matching
+        // Find element using selector with fallbacks
         let element = this.findElementBySelector(selector);
         
         if (element) {
-          console.log('🔍 [ActionExecutor] Found element, attempting click:', element);
-          console.log('🔍 [ActionExecutor] Element details:', {
-            tagName: element.tagName,
-            className: element.className,
-            id: element.id,
-            attributes: Array.from(element.attributes).map(attr => `${attr.name}="${attr.value}"`),
-            disabled: element.hasAttribute('disabled'),
-            hidden: element.hidden,
-            offsetWidth: element.offsetWidth,
-            offsetHeight: element.offsetHeight,
-            clientRect: element.getBoundingClientRect()
-          });
-          
-          // Try multiple click methods for custom web components
+          // Execute click
           const clickSuccess = this.tryMultipleClickMethods(element);
           
           if (clickSuccess) {
             return { success: true, data: { selector, element: element.tagName } };
           } else {
-            return { success: false, error: `Element found but click may not have triggered: ${selector}` };
+            return { success: false, error: `Element found but click failed: ${selector}` };
           }
         } else {
           return { success: false, error: `Element not found: ${selector}` };
@@ -123,97 +110,79 @@ export class ActionExecutor {
     }
   }
 
-  private tryMultipleClickMethods(element: HTMLElement): boolean {
-    console.log('🔍 [ActionExecutor] Trying click on:', element);
-    
-    try {
-      // Use simple click approach (like manual test that works)
-      console.log('🔍 [ActionExecutor] Executing single click()');
-      element.click();
-      
-      console.log('✅ [ActionExecutor] Click executed successfully');
-      return true;
-      
-    } catch (error) {
-      console.log('❌ [ActionExecutor] Error in click:', error);
-      return false;
-    }
-  }
-
   private findElementBySelector(selector: string): HTMLElement | null {
-    console.log('🔍 [ActionExecutor] Looking for element with selector:', selector);
+    console.log('🔍 [ActionExecutor] Finding element:', selector.split(',')[0] + '...');
     
-    // Split by commas to handle multiple selectors
     const selectors = selector.split(',').map(s => s.trim());
-    console.log('🔍 [ActionExecutor] Split selectors:', selectors);
     
     for (const sel of selectors) {
-      console.log('🔍 [ActionExecutor] Trying selector:', sel);
-      
       // Handle text-based selectors like "button:contains('text')"
       if (sel.includes(':contains(')) {
-        console.log('🔍 [ActionExecutor] Using text-based matching for:', sel);
         const element = this.findElementByText(sel);
         if (element) {
-          console.log('✅ [ActionExecutor] Found element via text matching:', element);
+          console.log('✅ [ActionExecutor] Found element via text matching');
           return element;
         }
         continue;
       }
       
-      // Regular DOM query
+      // Standard DOM query
       let element = document.querySelector(sel) as HTMLElement;
       if (element) {
-        console.log('✅ [ActionExecutor] Found element via regular query:', element);
-        
-        // Special handling for kat-dropdown-button shadow DOM
+        // Special handling for custom web components with shadow DOM
         if (element.tagName.toLowerCase() === 'kat-dropdown-button') {
-          console.log('🔍 [ActionExecutor] Found kat-dropdown-button, checking shadow DOM...');
+          console.log('🔍 [ActionExecutor] Found custom component, checking shadow DOM...');
           const shadowButton = this.findButtonInShadowDOM(element);
           if (shadowButton) {
-            console.log('✅ [ActionExecutor] Found button in shadow DOM:', shadowButton);
+            console.log('✅ [ActionExecutor] Using button from shadow DOM');
             return shadowButton;
           } else {
-            console.log('⚠️ [ActionExecutor] No shadow DOM button found, using component directly');
+            console.log('⚠️ [ActionExecutor] No shadow DOM button, using component directly');
             return element;
           }
         }
         
+        console.log('✅ [ActionExecutor] Found element via selector');
         return element;
       }
     }
     
-    console.log('❌ [ActionExecutor] No element found with any selector');
+    console.log('❌ [ActionExecutor] No element found');
     return null;
   }
 
+  /**
+   * Finds the actual clickable button inside a custom web component's shadow DOM
+   */
   private findButtonInShadowDOM(katButton: HTMLElement): HTMLElement | null {
     try {
-      // Check if the element has shadow root
       const shadowRoot = (katButton as any).shadowRoot;
       if (!shadowRoot) {
-        console.log('⚠️ [ActionExecutor] No shadow root found on kat-dropdown-button');
         return null;
       }
       
-      console.log('🔍 [ActionExecutor] Searching in shadow DOM...');
-      
-      // Look for the actual button inside shadow DOM
+      // Look for the actual button with multiple fallback selectors
       const shadowButton = shadowRoot.querySelector('button[part="dropdown-button-toggle-button"]') ||
                           shadowRoot.querySelector('button.indicator') ||
-                          shadowRoot.querySelector('button[aria-label="open dropdown"]') ||
+                          shadowRoot.querySelector('button[aria-label*="dropdown"]') ||
                           shadowRoot.querySelector('button');
       
-      if (shadowButton) {
-        console.log('✅ [ActionExecutor] Found button in shadow DOM:', shadowButton);
-        return shadowButton as HTMLElement;
-      } else {
-        console.log('❌ [ActionExecutor] No button found in shadow DOM');
-        return null;
-      }
+      return shadowButton as HTMLElement || null;
     } catch (error) {
-      console.log('❌ [ActionExecutor] Error accessing shadow DOM:', error);
+      console.log('❌ [ActionExecutor] Shadow DOM access error:', error);
       return null;
+    }
+  }
+
+  private tryMultipleClickMethods(element: HTMLElement): boolean {
+    try {
+      console.log('🔍 [ActionExecutor] Clicking element...');
+      element.click();
+      console.log('✅ [ActionExecutor] Click executed');
+      return true;
+    } catch (error) {
+      console.log('❌ [ActionExecutor] Click failed:', error);
+      return false;
     }
   }
 

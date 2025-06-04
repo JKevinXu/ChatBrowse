@@ -453,7 +453,14 @@ RULES:
 
     // Action planning
     console.log('⚡ [IntentService] Checking for action planning keywords...');
-    const actionKeywords = ['search', 'find', 'look for', 'videos about', 'click', 'bulk', 'actions', 'button', 'download', 'export', 'select'];
+    const actionKeywords = [
+      // Search and discovery
+      'search', 'find', 'look for', 'videos about',
+      // Interface interactions  
+      'click', 'open', 'select', 'button',
+      // Bulk operations
+      'bulk', 'actions', 'download', 'export'
+    ];
     const hasActionKeyword = actionKeywords.some(keyword => {
       const found = lowerText.includes(keyword);
       console.log(`   Action keyword "${keyword}":`, found);

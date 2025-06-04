@@ -546,24 +546,23 @@ class ContentScript {
   }
 }
 
-// Initialize when DOM is ready
-// Skip initialization on extension pages
+// Initialize content script when DOM is ready
+// Skip initialization on extension pages to avoid conflicts
 if (window.location.protocol === 'chrome-extension:') {
   console.log('ChatBrowse: Skipping initialization on extension page');
 } else if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    const contentScript = new ContentScript();
-    contentScript.initialize();
-    
-    // Set global variable for detection
-    (window as any).chatBrowseContentScript = true;
-    console.log('✅ ChatBrowse content script loaded and global variable set');
+    initializeContentScript();
   });
 } else {
+  initializeContentScript();
+}
+
+function initializeContentScript() {
   const contentScript = new ContentScript();
   contentScript.initialize();
   
-  // Set global variable for detection
+  // Set global variable for detection/debugging
   (window as any).chatBrowseContentScript = true;
-  console.log('✅ ChatBrowse content script loaded and global variable set');
+  console.log('✅ ChatBrowse content script loaded successfully');
 } 

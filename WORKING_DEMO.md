@@ -11,11 +11,37 @@ I've successfully implemented the intelligent action execution system for ChatBr
 - Updated `webpack.config.js` to build these files
 
 ### **🎯 Core Functionality:**
-1. **Smart Request Detection** - Recognizes phrases like "find videos about X"
+1. **Smart Request Detection** - Recognizes phrases like "find videos about X" and "click bulk actions"
 2. **Platform Awareness** - Detects YouTube, Google, Amazon automatically
 3. **Action Planning** - Creates specific action plans for user requests
 4. **Two-Step Execution** - Plan first, then execute on command
 5. **Visual Feedback** - Reports success/failure with details
+6. **Bulk Actions Support** - Can click bulk actions buttons and handle download options
+
+### **🆕 Latest Addition: Bulk Actions Support**
+- **Bulk Actions Recognition** - Detects requests like "click bulk actions", "open bulk actions", etc.
+- **Smart Selector Matching** - Uses multiple fallback selectors including text-based matching
+- **Download Integration** - Automatically handles download options when requested
+- **Robust Element Finding** - Supports both CSS selectors and text-based element detection
+
+## **🎉 COMPLETED: Bulk Actions Feature**
+
+### **✅ What Works:**
+- **Smart Detection**: Recognizes requests like "click bulk actions", "open bulk actions", etc.
+- **Shadow DOM Support**: Handles custom web components (`kat-dropdown-button`) automatically
+- **Robust Element Finding**: Multiple fallback selectors ensure compatibility
+- **Clean Execution**: Single-click approach matches manual interaction behavior
+
+### **🚀 How to Use:**
+1. **Plan**: `"click bulk actions"`
+2. **Execute**: `"do it"`
+3. **Result**: Bulk actions dropdown opens with options like "Download Selected", "Download All"
+
+### **🔧 Technical Implementation:**
+- **Enhanced ActionService**: Detects bulk actions patterns and creates appropriate action plans
+- **Shadow DOM Handler**: Automatically finds and clicks buttons inside custom web components
+- **Improved Intent Classification**: Updated to recognize bulk operations as action planning requests
+- **Clean Logging**: Essential debugging information without verbose output
 
 ## **🧪 How to Test Right Now**
 
@@ -37,9 +63,9 @@ npm run build
 3. Paste your OpenAI API key
 4. Save settings
 
-## **🎬 Test Scenario: YouTube Search**
+## **🎬 Test Scenarios**
 
-### **Full Test Sequence:**
+### **Test Scenario 1: YouTube Search**
 
 1. **Go to YouTube**
    - Navigate to `youtube.com`
@@ -58,20 +84,50 @@ npm run build
    ```
    I can help you with that! Here's my action plan:
    
-   1. Search YouTube for 'python programming' (90% confidence)
+   1. Search YouTube for 'python programming' (80% confidence)
    
    Say "do it" to execute these actions automatically.
    ```
 
-5. **Execute the Action**
-   - Type: `"do it"`
+### **Test Scenario 2: Bulk Actions**
+
+1. **Go to Amazon Seller Dashboard**
+   - Navigate to any page with a bulk actions button
+   - Load the sample seller dashboard page
+
+2. **Open ChatBrowse Popup**
+   - Click the ChatBrowse extension icon
+   - Popup should open with chat interface
+
+3. **Request Bulk Actions**
+   - Type: `"click bulk actions"`
+   - Or: `"open bulk actions button"`
+   - Or: `"click bulk actions and download"`
    - Press Enter
 
-6. **Watch the Magic!**
-   - YouTube search box should automatically fill with "python programming"
-   - Search should execute automatically
-   - Results page should load
-   - ChatBrowse reports success
+4. **Review Action Plan**
+   - Expected response for basic click:
+   ```
+   I can help you with that! Here's my action plan:
+   
+   1. Click the bulk actions button (90% confidence)
+   
+   Say "do it" to execute these actions automatically.
+   ```
+   
+   - Expected response for download request:
+   ```
+   I can help you with that! Here's my action plan:
+   
+   1. Click the bulk actions button (90% confidence)
+   2. Select download option from bulk actions menu (70% confidence)
+   
+   Say "do it" to execute these actions automatically.
+   ```
+
+5. **Execute the Actions**
+   - Type: `"do it"`
+   - Watch the bulk actions button get clicked automatically
 
 ## **📋 Expected Results**
 
