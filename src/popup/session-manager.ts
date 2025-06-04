@@ -133,6 +133,56 @@ export class SessionManager {
     return this.currentSession;
   }
 
+  async startNewConversation(url: string, title: string): Promise<ChatSession> {
+    console.log('🔄 SessionManager: Starting new conversation for:', { url, title });
+    
+    try {
+      // Generate session key for current URL
+      const sessionKey = `session_${this.generateUrlHash(url)}`;
+      console.log('🔧 SessionManager: Generated session key for clearing:', sessionKey);
+      
+      // Clear existing session from storage
+      try {
+        console.log('🗑️ SessionManager: Clearing existing session from storage...');
+        await chrome.storage.local.remove(sessionKey);
+        console.log('✅ SessionManager: Existing session cleared successfully');
+      } catch (clearError) {
+        console.warn('⚠️ SessionManager: Could not clear existing session:', clearError);
+        // Continue anyway - not critical
+      }
+      
+      // Create new session
+      console.log('🔧 SessionManager: Creating new session...');
+      const newSession = createChatSession(url, title);
+      console.log('✅ SessionManager: New session created:', { 
+        id: newSession.id, 
+        messagesCount: newSession.messages.length 
+      });
+      
+      // Save new session to storage
+      console.log('💾 SessionManager: Saving new session to storage...');
+      await saveToStorage(sessionKey, newSession);
+      console.log('✅ SessionManager: New session saved successfully');
+      
+      // Update current session
+      this.currentSession = newSession;
+      console.log('🎉 SessionManager: New conversation started successfully');
+      
+      return newSession;
+      
+    } catch (error) {
+      console.error('❌ SessionManager: Error starting new conversation:', error);
+      
+      // Create fallback session if something goes wrong
+      console.log('🔧 SessionManager: Creating fallback session...');
+      const fallbackSession = createChatSession(url, title);
+      this.currentSession = fallbackSession;
+      console.log('✅ SessionManager: Fallback session created');
+      
+      return fallbackSession;
+    }
+  }
+
   private generateUrlHash(url: string): string {
     console.log('🔧 SessionManager: Generating hash for URL:', url);
     // Simple hash function for URL-based session keys

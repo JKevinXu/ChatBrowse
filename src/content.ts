@@ -89,6 +89,10 @@ class ContentScript {
           this.handleClearChat(sendResponse);
           return true;
           
+        case 'START_NEW_CONVERSATION':
+          this.handleStartNewConversation(sendResponse);
+          return true;
+          
         case 'EXECUTE_ACTION':
           this.handleExecuteAction(request.action, sendResponse);
           return true;
@@ -541,6 +545,37 @@ class ContentScript {
         pageUrl: window.location.href,
         pageTitle: document.title,
         platform: 'unknown'
+      });
+    }
+  }
+
+  private async handleStartNewConversation(sendResponse: (response: any) => void): Promise<void> {
+    try {
+      console.log('🔄 CONTENT: Starting new conversation');
+      
+      // Extract current page info
+      const pageInfo = await extractPageInfo();
+      const { title, url } = pageInfo;
+      
+      // Create a new session
+      this.currentSession = createChatSession(url, title);
+      
+      // Clear the chat UI and reinitialize with new session
+      this.chatUI.clearChat();
+      this.chatUI.updateSession(this.currentSession);
+      
+      console.log('✅ CONTENT: New conversation started successfully');
+      sendResponse({ 
+        success: true, 
+        message: 'New conversation started',
+        sessionId: this.currentSession.id 
+      });
+      
+    } catch (error) {
+      console.error('❌ CONTENT: Error starting new conversation:', error);
+      sendResponse({ 
+        success: false, 
+        error: (error as Error).message 
       });
     }
   }

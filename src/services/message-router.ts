@@ -66,6 +66,10 @@ export class MessageRouter {
           console.log('🐛 DEBUG: Handling CLEAR_CHAT');
           return this.handleClearChat(sender, sendResponse);
         
+        case 'START_NEW_CONVERSATION':
+          console.log('🐛 DEBUG: Handling START_NEW_CONVERSATION');
+          return this.handleStartNewConversation(sender, sendResponse);
+        
         case 'SET_CONTEXT':
           console.log('🐛 DEBUG: Handling SET_CONTEXT');
           return this.handleSetContext(request.payload, sender, sendResponse);
@@ -496,6 +500,40 @@ export class MessageRouter {
     });
 
     return false;
+  }
+
+  private handleStartNewConversation(
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response: ChatResponse) => void
+  ): boolean {
+    const tabId = sender.tab?.id;
+    if (!tabId) {
+      sendResponse({
+        type: 'ERROR',
+        payload: { message: 'Could not determine tab ID' }
+      });
+      return false;
+    }
+
+    chrome.tabs.sendMessage(tabId, { type: 'START_NEW_CONVERSATION' }, (response) => {
+      if (response && response.success) {
+        sendResponse({
+          type: 'MESSAGE',
+          payload: { 
+            text: 'New conversation started! How can I help you?', 
+            success: true,
+            sessionId: response.sessionId 
+          }
+        });
+      } else {
+        sendResponse({
+          type: 'ERROR',
+          payload: { message: response?.error || 'Failed to start new conversation' }
+        });
+      }
+    });
+
+    return true; // Keep message channel open for async response
   }
 
   private handleSetContext(

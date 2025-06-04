@@ -11,7 +11,10 @@ class PopupApp {
   constructor() {
     console.log('🔧 PopupApp: Constructor starting...');
     this.sessionManager = new SessionManager();
-    this.ui = new PopupUI((text) => this.handleUserMessage(text));
+    this.ui = new PopupUI(
+      (text) => this.handleUserMessage(text),
+      () => this.handleNewConversation()
+    );
     this.messageHandler = new MessageHandler((message) => this.handleIncomingMessage(message));
     console.log('🔧 PopupApp: Constructor completed');
   }
@@ -146,6 +149,64 @@ class PopupApp {
     console.log('📨 PopupApp: Handling incoming message:', message);
     this.ui.addMessageToChat(message);
     await this.sessionManager.addMessageToSession(message);
+  }
+
+  private async handleNewConversation(): Promise<void> {
+    console.log('🔄 PopupApp: Starting new conversation...');
+    
+    try {
+      // Show loading state
+      this.ui.showProcessingIndicator('Starting new conversation...');
+      
+      // Get current tab info
+      const tabs = await this.sessionManager.getCurrentTab();
+      let tabUrl = '';
+      let tabTitle = 'ChatBrowse';
+      
+      if (tabs && tabs.length > 0) {
+        const currentTab = tabs[0];
+        tabUrl = currentTab.url || '';
+        tabTitle = currentTab.title || 'Untitled Page';
+      }
+      
+      console.log('🔧 PopupApp: Creating new session for:', { url: tabUrl, title: tabTitle });
+      
+      // Start new conversation using session manager
+      const newSession = await this.sessionManager.startNewConversation(tabUrl, tabTitle);
+      console.log('✅ PopupApp: New session created:', { id: newSession.id, messagesCount: newSession.messages.length });
+      
+      // Clear the UI and render the new session messages
+      this.ui.clearChat();
+      this.renderMessages(newSession.messages);
+      
+      // Also notify the content script if we're on a valid tab
+      if (tabs && tabs.length > 0 && tabs[0].id) {
+        console.log('🔧 PopupApp: Notifying content script of new conversation...');
+        chrome.runtime.sendMessage({
+          type: 'START_NEW_CONVERSATION'
+        }, (response) => {
+          if (response && response.type === 'MESSAGE') {
+            console.log('✅ PopupApp: Content script notified successfully');
+          } else if (response && response.type === 'ERROR') {
+            console.warn('⚠️ PopupApp: Content script notification failed:', response.payload.message);
+          }
+        });
+      }
+      
+      // Hide loading state
+      this.ui.hideProcessingIndicator();
+      
+      console.log('🎉 PopupApp: New conversation started successfully');
+      
+    } catch (error) {
+      console.error('❌ PopupApp: Error starting new conversation:', error);
+      
+      // Hide loading state and show error
+      this.ui.hideProcessingIndicator();
+      
+      const errorMessage = createMessage('Failed to start new conversation. Please try again.', 'system');
+      this.ui.addMessageToChat(errorMessage);
+    }
   }
 }
 

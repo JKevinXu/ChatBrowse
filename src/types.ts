@@ -58,4 +58,9 @@ export interface StorageData {
     showNotifications: boolean;
     llm?: LLMSettings;
   };
+}
+
+export interface BackgroundMessage {
+  type: 'SEND_MESSAGE' | 'CLEAR_CHAT' | 'START_NEW_CONVERSATION' | 'NAVIGATE' | 'EXTRACT_INFO' | 'SET_CONTEXT' | 'CONTENT_SCRIPT_READY' | 'SUMMARIZE_XIAOHONGSHU_POSTS';
+  payload?: any;
 } 

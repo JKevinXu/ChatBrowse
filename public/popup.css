@@ -42,7 +42,14 @@ body {
   font-weight: 600;
 }
 
-#settingsButton {
+.header-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#settingsButton,
+#newConversationButton {
   background: none;
   border: none;
   color: white;
@@ -53,8 +60,13 @@ body {
   transition: background-color 0.2s;
 }
 
-#settingsButton:hover {
+#settingsButton:hover,
+#newConversationButton:hover {
   background-color: rgba(255, 255, 255, 0.2);
+}
+
+#newConversationButton {
+  font-size: 16px; /* Slightly smaller for the refresh icon */
 }
 
 .chat-messages {

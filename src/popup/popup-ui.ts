@@ -7,10 +7,13 @@ export class PopupUI {
   private userInput: HTMLInputElement | null = null;
   private sendButton: HTMLElement | null = null;
   private settingsButton: HTMLElement | null = null;
+  private newConversationButton: HTMLElement | null = null;
   private onMessageSend?: (text: string) => void;
+  private onNewConversation?: () => void;
 
-  constructor(onMessageSend?: (text: string) => void) {
+  constructor(onMessageSend?: (text: string) => void, onNewConversation?: () => void) {
     this.onMessageSend = onMessageSend;
+    this.onNewConversation = onNewConversation;
     this.setupMarked();
   }
 
@@ -32,6 +35,7 @@ export class PopupUI {
     this.userInput = document.getElementById('userInput') as HTMLInputElement;
     this.sendButton = document.getElementById('sendButton');
     this.settingsButton = document.getElementById('settingsButton');
+    this.newConversationButton = document.getElementById('newConversationButton');
   }
 
   private setupEventListeners(): void {
@@ -45,6 +49,12 @@ export class PopupUI {
 
     this.settingsButton?.addEventListener('click', () => {
       chrome.runtime.openOptionsPage();
+    });
+
+    this.newConversationButton?.addEventListener('click', () => {
+      if (this.onNewConversation) {
+        this.onNewConversation();
+      }
     });
   }
 
