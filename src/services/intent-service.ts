@@ -44,87 +44,60 @@ export class IntentService {
     console.log('📝 [IntentService] Input text:', JSON.stringify(text));
     console.log('🌐 [IntentService] Context:', JSON.stringify(context));
 
-    try {
-      const llmSettings = await this.configService.getLLMSettings();
-      const provider = llmSettings.provider;
-      
-      console.log('⚙️ [IntentService] LLM provider:', provider);
+    const llmSettings = await this.configService.getLLMSettings();
+    const provider = llmSettings.provider;
+    
+    console.log('⚙️ [IntentService] LLM provider:', provider);
 
-      // Check if LLM is available
-      console.log('🔍 [IntentService] Checking if LLM provider is available...');
-      const isAvailable = await this.isProviderAvailable(provider);
-      console.log('✅ [IntentService] LLM provider available:', isAvailable);
-      
-      if (!isAvailable) {
-        console.log('⚠️ [IntentService] LLM not available, falling back to rule-based classification');
-        const fallbackResult = this.fallbackClassification(text, context);
-        console.log('📊 [IntentService] Fallback result:', JSON.stringify(fallbackResult));
-        return fallbackResult;
-      }
-
-      console.log('🚀 [IntentService] Using LLM for classification');
-      const prompt = this.createIntentClassificationPrompt(text, context);
-      console.log('📋 [IntentService] Generated prompt:');
-      console.log('---PROMPT START---');
-      console.log(prompt);
-      console.log('---PROMPT END---');
-
-      console.log('🤖 [IntentService] Sending request to LLM...');
-      const response = await this.generateText(prompt, 300, provider);
-      console.log('📨 [IntentService] Raw LLM response:');
-      console.log('---RESPONSE START---');
-      console.log(response);
-      console.log('---RESPONSE END---');
-
-      try {
-        console.log('🔧 [IntentService] Parsing LLM response as JSON...');
-        
-        // Clean the response to handle markdown code blocks
-        let cleanedResponse = response.trim();
-        
-        // Remove markdown code block markers if present
-        if (cleanedResponse.startsWith('```json')) {
-          console.log('🧹 [IntentService] Removing markdown json code block markers...');
-          cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
-        } else if (cleanedResponse.startsWith('```')) {
-          console.log('🧹 [IntentService] Removing markdown code block markers...');
-          cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-        
-        console.log('🧽 [IntentService] Cleaned response:');
-        console.log('---CLEANED START---');
-        console.log(cleanedResponse);
-        console.log('---CLEANED END---');
-        
-        const intentResult = JSON.parse(cleanedResponse);
-        console.log('✅ [IntentService] Successfully parsed JSON:', JSON.stringify(intentResult));
-        
-        const validatedResult = this.validateIntentResult(intentResult);
-        console.log('🎯 [IntentService] Final validated result:', JSON.stringify(validatedResult));
-        return validatedResult;
-        
-      } catch (parseError) {
-        console.error('❌ [IntentService] Failed to parse LLM response as JSON:', parseError);
-        console.log('📄 [IntentService] Raw response that failed to parse:', JSON.stringify(response));
-        console.log('⚠️ [IntentService] Falling back to rule-based classification due to parse error');
-        
-        const fallbackResult = this.fallbackClassification(text, context);
-        console.log('📊 [IntentService] Fallback result:', JSON.stringify(fallbackResult));
-        return fallbackResult;
-      }
-
-    } catch (error) {
-      console.error('❌ [IntentService] Intent classification error:', error);
-      console.error('🔍 [IntentService] Error details:', {
-        message: (error as Error).message,
-        stack: (error as Error).stack
-      });
-      console.log('⚠️ [IntentService] Falling back to rule-based classification due to error');
-      
-      const fallbackResult = this.fallbackClassification(text, context);
-      console.log('📊 [IntentService] Fallback result:', JSON.stringify(fallbackResult));
-      return fallbackResult;
+    // Check if LLM is available
+    console.log('🔍 [IntentService] Checking if LLM provider is available...');
+    const isAvailable = await this.isProviderAvailable(provider);
+    console.log('✅ [IntentService] LLM provider available:', isAvailable);
+    
+    if (!isAvailable) {
+      console.error('❌ [IntentService] LLM not available - no fallback classification');
+      throw new Error('LLM provider is not available and fallback classification has been removed');
     }
+
+    console.log('🚀 [IntentService] Using LLM for classification');
+    const prompt = this.createIntentClassificationPrompt(text, context);
+    console.log('📋 [IntentService] Generated prompt:');
+    console.log('---PROMPT START---');
+    console.log(prompt);
+    console.log('---PROMPT END---');
+
+    console.log('🤖 [IntentService] Sending request to LLM...');
+    const response = await this.generateText(prompt, 300, provider);
+    console.log('📨 [IntentService] Raw LLM response:');
+    console.log('---RESPONSE START---');
+    console.log(response);
+    console.log('---RESPONSE END---');
+
+    console.log('🔧 [IntentService] Parsing LLM response as JSON...');
+    
+    // Clean the response to handle markdown code blocks
+    let cleanedResponse = response.trim();
+    
+    // Remove markdown code block markers if present
+    if (cleanedResponse.startsWith('```json')) {
+      console.log('🧹 [IntentService] Removing markdown json code block markers...');
+      cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+    } else if (cleanedResponse.startsWith('```')) {
+      console.log('🧹 [IntentService] Removing markdown code block markers...');
+      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    
+    console.log('🧽 [IntentService] Cleaned response:');
+    console.log('---CLEANED START---');
+    console.log(cleanedResponse);
+    console.log('---CLEANED END---');
+    
+    const intentResult = JSON.parse(cleanedResponse);
+    console.log('✅ [IntentService] Successfully parsed JSON:', JSON.stringify(intentResult));
+    
+    const validatedResult = this.validateIntentResult(intentResult);
+    console.log('🎯 [IntentService] Final validated result:', JSON.stringify(validatedResult));
+    return validatedResult;
   }
 
   private async isProviderAvailable(provider: string): Promise<boolean> {
@@ -268,229 +241,5 @@ RULES:
     console.log('   Has reasoning:', !!validatedResult.reasoning);
 
     return validatedResult;
-  }
-
-  private fallbackClassification(text: string, context?: {
-    currentUrl?: string;
-    hasStoredActionPlan?: boolean;
-    pageTitle?: string;
-  }): IntentResult {
-    console.log('🔄 [IntentService] Starting fallback rule-based classification');
-    console.log('📝 [IntentService] Fallback input text:', JSON.stringify(text));
-    console.log('🌐 [IntentService] Fallback context:', JSON.stringify(context));
-
-    const lowerText = text.toLowerCase().trim();
-    console.log('🔤 [IntentService] Lowercase text:', JSON.stringify(lowerText));
-
-    // Action execution (highest priority if there's a stored plan)
-    const executionPhrases = ['do it', 'execute', 'run it', 'go ahead', 'proceed'];
-    console.log('🎯 [IntentService] Checking for action execution phrases...');
-    
-    if (context?.hasStoredActionPlan && executionPhrases.some(phrase => lowerText.includes(phrase))) {
-      console.log('✅ [IntentService] Matched action execution with stored plan');
-      const result = {
-        intent: 'action_execution' as const,
-        confidence: 0.9,
-        parameters: {},
-        reasoning: 'Matched execution phrase with stored action plan'
-      };
-      console.log('📊 [IntentService] Fallback result (action_execution):', JSON.stringify(result));
-      return result;
-    }
-    console.log('⏭️ [IntentService] No action execution match');
-
-    // Navigation patterns
-    const navigationPatterns = [
-      /^go to (.+)$/i,
-      /^navigate to (.+)$/i,
-      /^login to (.+)$/i,
-      /^(.+) login$/i
-    ];
-
-    console.log('🧭 [IntentService] Checking navigation patterns...');
-    for (const [index, pattern] of navigationPatterns.entries()) {
-      console.log(`   Testing pattern ${index + 1}:`, pattern.toString());
-      const match = lowerText.match(pattern);
-      if (match) {
-        console.log('✅ [IntentService] Matched navigation pattern:', pattern.toString());
-        console.log('🔗 [IntentService] Extracted URL/platform:', match[1]);
-        
-        const result = {
-          intent: 'navigation' as const,
-          confidence: 0.85,
-          parameters: {
-            url: match[1],
-            platform: match[1]
-          },
-          reasoning: 'Matched navigation pattern'
-        };
-        console.log('📊 [IntentService] Fallback result (navigation):', JSON.stringify(result));
-        return result;
-      }
-    }
-    console.log('⏭️ [IntentService] No navigation pattern match');
-
-    // Search patterns
-    console.log('🔍 [IntentService] Checking for search keywords...');
-    const searchKeywords = ['search', 'find', 'look for', '搜', '搜索', '查找', '找'];
-    const hasSearchKeyword = searchKeywords.some(keyword => {
-      const found = lowerText.includes(keyword);
-      console.log(`   Keyword "${keyword}":`, found);
-      return found;
-    });
-
-    if (hasSearchKeyword) {
-      console.log('✅ [IntentService] Found search keywords, analyzing...');
-      
-      let engine = 'general';
-      let query = text;
-
-      console.log('🔧 [IntentService] Detecting search engine...');
-      if (lowerText.includes('google')) {
-        engine = 'google';
-        query = text.replace(/google|search|for|find|搜|搜索/gi, '').trim();
-        console.log('   Detected Google search');
-      } else if (lowerText.includes('bilibili')) {
-        engine = 'bilibili';
-        query = text.replace(/bilibili|search|for|find|搜|搜索/gi, '').trim();
-        console.log('   Detected Bilibili search');
-      } else if (lowerText.includes('xiaohongshu') || lowerText.includes('小红书')) {
-        engine = 'xiaohongshu';
-        query = text.replace(/xiaohongshu|小红书|search|for|find|搜|搜索|用|去/gi, '').trim();
-        console.log('   Detected Xiaohongshu search');
-      } else {
-        console.log('   Using general search engine');
-        // Clean up Chinese search terms for general search
-        query = text.replace(/search|for|find|搜|搜索/gi, '').trim();
-      }
-
-      console.log('🔍 [IntentService] Final search parameters:');
-      console.log('   Engine:', engine);
-      console.log('   Query:', JSON.stringify(query));
-
-      const result = {
-        intent: 'search' as const,
-        confidence: 0.8,
-        parameters: {
-          query,
-          engine
-        },
-        reasoning: 'Matched search keywords'
-      };
-      console.log('📊 [IntentService] Fallback result (search):', JSON.stringify(result));
-      return result;
-    }
-    console.log('⏭️ [IntentService] No search keywords found');
-
-    // Xiaohongshu specific (also check for Chinese patterns)
-    console.log('📱 [IntentService] Checking for Xiaohongshu-specific patterns...');
-    if (lowerText.includes('xiaohongshu') || lowerText.includes('小红书')) {
-      console.log('✅ [IntentService] Found Xiaohongshu mention, checking specific actions...');
-      
-      // Check for Chinese search patterns like "用小红书搜..." or "小红书搜索..."
-      const chineseSearchPatterns = [
-        /用小红书搜(.+)/i,
-        /小红书搜索(.+)/i,
-        /小红书搜(.+)/i,
-        /在小红书搜(.+)/i,
-        /去小红书搜(.+)/i
-      ];
-      
-      for (const pattern of chineseSearchPatterns) {
-        const match = text.match(pattern);
-        if (match && match[1]) {
-          console.log('✅ [IntentService] Matched Chinese Xiaohongshu search pattern');
-          const extractedQuery = match[1].trim();
-          console.log('🔍 [IntentService] Extracted query from Chinese pattern:', JSON.stringify(extractedQuery));
-          
-          const result = {
-            intent: 'search' as const,
-            confidence: 0.9,
-            parameters: {
-              query: extractedQuery,
-              engine: 'xiaohongshu'
-            },
-            reasoning: 'Matched Chinese Xiaohongshu search pattern'
-          };
-          console.log('📊 [IntentService] Fallback result (Chinese xiaohongshu search):', JSON.stringify(result));
-          return result;
-        }
-      }
-      
-      if (lowerText.includes('summarize') || lowerText.includes('summary') || lowerText.includes('总结') || lowerText.includes('汇总')) {
-        console.log('📋 [IntentService] Detected Xiaohongshu summarization request');
-        const queryText = text.replace(/xiaohongshu|小红书|summarize|summary|总结|汇总/gi, '').trim();
-        console.log('🔍 [IntentService] Extracted query:', JSON.stringify(queryText));
-        
-        const result = {
-          intent: 'xiaohongshu_summary' as const,
-          confidence: 0.85,
-          parameters: {
-            query: queryText
-          },
-          reasoning: 'Xiaohongshu summarization request'
-        };
-        console.log('📊 [IntentService] Fallback result (xiaohongshu_summary):', JSON.stringify(result));
-        return result;
-      }
-      
-      if (lowerText.includes('extract') || lowerText.includes('提取')) {
-        console.log('📤 [IntentService] Detected Xiaohongshu extraction request');
-        const result = {
-          intent: 'xiaohongshu_extract' as const,
-          confidence: 0.85,
-          parameters: {},
-          reasoning: 'Xiaohongshu extraction request'
-        };
-        console.log('📊 [IntentService] Fallback result (xiaohongshu_extract):', JSON.stringify(result));
-        return result;
-      }
-      
-      console.log('⏭️ [IntentService] Xiaohongshu mentioned but no specific action detected');
-    } else {
-      console.log('⏭️ [IntentService] No Xiaohongshu mention found');
-    }
-
-    // Action planning
-    console.log('⚡ [IntentService] Checking for action planning keywords...');
-    const actionKeywords = [
-      // Search and discovery
-      'search', 'find', 'look for', 'videos about',
-      // Interface interactions  
-      'click', 'open', 'select', 'button',
-      // Bulk operations
-      'bulk', 'actions', 'download', 'export'
-    ];
-    const hasActionKeyword = actionKeywords.some(keyword => {
-      const found = lowerText.includes(keyword);
-      console.log(`   Action keyword "${keyword}":`, found);
-      return found;
-    });
-
-    if (hasActionKeyword) {
-      console.log('✅ [IntentService] Found action planning keywords');
-      const result = {
-        intent: 'action_planning' as const,
-        confidence: 0.7,
-        parameters: {
-          action: text
-        },
-        reasoning: 'Matched action planning keywords'
-      };
-      console.log('📊 [IntentService] Fallback result (action_planning):', JSON.stringify(result));
-      return result;
-    }
-    console.log('⏭️ [IntentService] No action planning keywords found');
-
-    // Default to general chat
-    console.log('💬 [IntentService] No specific patterns matched, defaulting to general_chat');
-    const result = {
-      intent: 'general_chat' as const,
-      confidence: 0.5,
-      parameters: {},
-      reasoning: 'No specific intent pattern matched'
-    };
-    console.log('📊 [IntentService] Fallback result (general_chat):', JSON.stringify(result));
-    return result;
   }
 } 

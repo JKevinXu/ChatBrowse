@@ -2,27 +2,27 @@
 
 ## Overview
 
-The ChatBrowse extension now uses **LLM-powered intent classification** to understand user requests more intelligently than the previous rule-based approach. This provides more flexible natural language understanding and better handling of edge cases.
+The ChatBrowse extension uses **LLM-powered intent classification** to understand user requests intelligently. The system requires a configured LLM provider and will throw errors if the LLM is unavailable.
 
-## Key Improvements
+## Key Features
 
 ### 🧠 **Intelligent Understanding**
-- **Before**: Rigid keyword matching (`"search google"` worked, `"could you search google please?"` didn't)
-- **After**: Natural language understanding that handles variations, politeness, and context
+- Natural language understanding that handles variations, politeness, and context
+- Flexible command interpretation beyond rigid keyword matching
 
 ### 📊 **Confidence Scoring** 
 - Each classification comes with a confidence score (0.0-1.0)
-- Low confidence triggers fallback to rule-based classification
-- Helps identify ambiguous requests
+- Provides reasoning for each classification decision
 
 ### 🔧 **Better Parameter Extraction**
 - Automatically extracts search queries, URLs, and platform names
 - Handles complex sentence structures
 - Provides reasoning for each classification decision
 
-### 🛡️ **Robust Fallback**
-- If LLM is unavailable or fails, gracefully falls back to rule-based classification
-- Ensures the extension always works, even without API access
+### ⚡ **LLM-Only Approach**
+- **Requires LLM configuration**: OpenAI or AWS Bedrock must be configured
+- **No fallback**: If LLM is unavailable, the system will return errors
+- **Consistent behavior**: All classifications use the same intelligent approach
 
 ## Intent Types
 
@@ -43,7 +43,7 @@ The system classifies user input into these categories:
 ### Core Components
 
 ```typescript
-// New LLM-based intent service
+// LLM-based intent service (no fallback)
 IntentService.classifyIntent(text: string, context?: {
   currentUrl?: string;
   hasStoredActionPlan?: boolean;
@@ -66,18 +66,18 @@ User Input → IntentService → LLM Classification → MessageRouter → Action
                     ↓
               [If LLM fails]
                     ↓
-           Rule-based Fallback → MessageRouter → Action Handler
+            Throw Error → Return Error Response
 ```
 
 ## Examples
 
 ### Natural Language Variations
 ```javascript
-// All of these now work correctly:
-"search google for cats"           // Original rule-based ✅
-"could you search google for cats?" // LLM improvement ✅
-"I want to find cats on google"    // LLM improvement ✅
-"please help me search for cats"   // LLM improvement ✅
+// All of these work with LLM classification:
+"search google for cats"           // Direct command ✅
+"could you search google for cats?" // Polite request ✅
+"I want to find cats on google"    // Natural language ✅
+"please help me search for cats"   // Help-seeking language ✅
 ```
 
 ### Context-Aware Classification
@@ -107,13 +107,24 @@ classifyIntent("search bilibili for cooking videos")
 
 ## Configuration
 
-The system uses your existing LLM configuration (OpenAI or AWS Bedrock) from the extension settings. No additional setup required!
+**IMPORTANT**: The system requires LLM configuration to function:
 
-### Fallback Behavior
+1. **OpenAI Configuration**: Requires valid API key in extension settings
+2. **AWS Bedrock Configuration**: Requires valid AWS credentials and region
 
-- If no LLM provider is configured → Uses rule-based classification
-- If LLM request fails → Falls back to rule-based classification  
-- If LLM returns invalid JSON → Falls back to rule-based classification
+### Error Handling
+
+- If no LLM provider is configured → Throws error
+- If LLM request fails → Throws error  
+- If LLM response is invalid → Throws error
+
+The extension will display error messages to users when LLM is unavailable.
+
+## Migration Notes
+
+- **Removed fallback classification**: System no longer falls back to rule-based patterns
+- **LLM dependency**: Extension now requires working LLM configuration
+- **Consistent behavior**: All intent classification uses the same intelligent approach
 
 ## Performance
 

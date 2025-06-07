@@ -294,78 +294,19 @@ export class MessageRouter {
         stack: (error as Error).stack,
         name: (error as Error).name
       });
-      console.log('🔄 [MessageRouter] Falling back to legacy rule-based routing');
+      console.log('❌ [MessageRouter] No fallback available - throwing error');
       
-      // Fallback to legacy rule-based routing
-      const legacyResult = await this.handleUserMessageLegacy(payload, sender, sendResponse);
-      console.log('📊 [MessageRouter] Legacy routing result:', legacyResult);
-      return legacyResult;
+      // Send error response instead of falling back
+      sendResponse({
+        type: 'ERROR',
+        payload: { 
+          message: `Intent classification failed: ${(error as Error).message}` 
+        }
+      });
+      return false;
     } finally {
       console.log('🎯 [MessageRouter] ===== FINISHED USER MESSAGE HANDLING =====');
     }
-  }
-
-  // Legacy fallback method (keeping the original logic as backup)
-  private async handleUserMessageLegacy(
-    payload: any,
-    sender: chrome.runtime.MessageSender,
-    sendResponse: (response: ChatResponse) => void
-  ): Promise<boolean> {
-    const { text, sessionId } = payload;
-    const tabId = sender.tab?.id || payload.tabId;
-
-    // Check for action execution commands first (like "do it")
-    if (this.actionService.isExecutionCommand(text) && tabId) {
-      console.log('🐛 DEBUG: Legacy - Action execution command detected');
-      await this.actionService.executeStoredPlan(tabId, sendResponse, sessionId);
-      return true;
-    }
-
-    // Check for navigation commands
-    if (this.navigationService.isNavigationCommand(text)) {
-      console.log('🐛 DEBUG: Legacy - Navigation command detected');
-      await this.navigationService.handleNavigation(text, tabId, sendResponse, sessionId);
-      return true;
-    }
-
-    // Check for Xiaohongshu search and summarize commands
-    const xiaohongshuSummaryQuery = this.parseXiaohongshuSummaryCommand(text);
-    if (xiaohongshuSummaryQuery) {
-      console.log('🐛 DEBUG: Legacy - Xiaohongshu summary command matched');
-      await this.handleXiaohongshuSummarization({ 
-        query: xiaohongshuSummaryQuery, 
-        tabId, 
-        sessionId 
-      }, sender, sendResponse);
-      return true;
-    }
-
-    // Check for search commands BEFORE general action requests
-    const searchResult = this.searchService.parseSearchCommand(text);
-    if (searchResult) {
-      console.log('🐛 DEBUG: Legacy - General search command detected');
-      await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId);
-      return true;
-    }
-
-    // Check for Xiaohongshu post extraction
-    if (text.toLowerCase().includes('extract') && text.toLowerCase().includes('xiaohongshu')) {
-      console.log('🐛 DEBUG: Legacy - Xiaohongshu extract command detected');
-      await this.extractionService.extractXiaohongshuPosts(tabId, sendResponse, sessionId, true);
-      return true;
-    }
-
-    // Check for action planning requests (after specific commands)
-    if (this.actionService.isActionRequest(text) && tabId) {
-      console.log('🐛 DEBUG: Legacy - Action planning request detected');
-      await this.actionService.planActions(text, tabId, sendResponse, sessionId);
-      return true;
-    }
-
-    // Handle general AI chat
-    console.log('🐛 DEBUG: Legacy - Falling back to general AI chat');
-    await this.llmService.handleChat(payload, sender, sendResponse);
-    return true;
   }
 
   private async handleNavigation(
