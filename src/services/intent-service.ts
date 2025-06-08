@@ -157,10 +157,14 @@ INTENT TYPES:
 3. "search" - User wants to search on a specific platform (e.g., "search google for cats", "find videos about cooking on bilibili", "xiaohongshu search fashion", "用小红书搜口袋黄", "小红书搜索时尚")
 4. "xiaohongshu_summary" - User wants to summarize Xiaohongshu content (e.g., "summarize xiaohongshu posts about travel", "sum up xiaohongshu fashion posts", "总结小红书旅游帖子")
 5. "xiaohongshu_extract" - User wants to extract Xiaohongshu posts (e.g., "extract xiaohongshu posts", "get posts from this page", "提取小红书帖子")
-6. "action_planning" - User wants to plan actions on current page (e.g., "search for something", "find products", "look for videos", "click bulk actions", "download data", "select items", "click button")
-7. "general_chat" - General conversation or questions that don't fit other categories
+6. "action_planning" - User wants to plan SPECIFIC UI actions on current page (e.g., "click bulk actions", "download data", "select items", "click the submit button", "fill out the form")
+7. "general_chat" - General conversation, questions, or content requests that don't fit other categories (e.g., "what's the weather?", "tell me a joke", "summarize the page", "explain this content", "what does this mean?")
 
-IMPORTANT: "action_planning" is for NEW actions the user wants to perform (like clicking buttons, downloading, selecting items), while "action_execution" is ONLY for executing previously stored plans.
+IMPORTANT DISTINCTIONS:
+- "action_planning" is ONLY for specific UI interactions (clicking, selecting, downloading, form filling)
+- "general_chat" includes content analysis, page summarization, explanations, and general questions
+- "xiaohongshu_summary" is specifically for analyzing Xiaohongshu platform content
+- General page summarization requests like "summarize the page" should be "general_chat"
 
 ${contextInfo}
 

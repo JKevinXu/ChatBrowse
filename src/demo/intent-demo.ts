@@ -46,6 +46,10 @@ export class IntentDemo {
       { text: 'what is the weather today?', description: 'General question' },
       { text: 'tell me a joke', description: 'Entertainment request' },
       { text: 'how does machine learning work?', description: 'Educational question' },
+      { text: 'summarize the page', description: 'General page summarization request' },
+      { text: 'explain this content', description: 'Content explanation request' },
+      { text: 'what does this page mean?', description: 'Page interpretation request' },
+      { text: 'give me a summary of what I\'m looking at', description: 'Natural language page summary' },
 
       // Chinese Xiaohongshu patterns
       { text: '用小红书搜口袋黄', description: 'Chinese Xiaohongshu search pattern' },

@@ -35,8 +35,32 @@ The system classifies user input into these categories:
 | `search` | Search on specific platforms | "search google for cats", "find videos on bilibili" |
 | `xiaohongshu_summary` | Summarize Xiaohongshu content | "summarize xiaohongshu posts about travel" |
 | `xiaohongshu_extract` | Extract Xiaohongshu posts | "extract posts from this page" |
-| `action_planning` | Plan actions on current page | "help me find products", "search for something" |
-| `general_chat` | General conversation | "what's the weather?", "tell me a joke" |
+| `action_planning` | Plan specific UI actions on current page | "click bulk actions", "download data", "select items", "fill out the form" |
+| `general_chat` | General conversation, questions, and content requests | "what's the weather?", "summarize the page", "explain this content" |
+
+### Intent Classification Rules
+
+#### **action_planning vs general_chat**
+- **`action_planning`**: Only for specific UI interactions
+  - ✅ "click the submit button"
+  - ✅ "download the data" 
+  - ✅ "select all items"
+  - ✅ "fill out this form"
+
+- **`general_chat`**: For content analysis and general requests
+  - ✅ "summarize the page"
+  - ✅ "explain this content"
+  - ✅ "what does this mean?"
+  - ✅ "tell me about this page"
+
+#### **xiaohongshu_summary vs general_chat**
+- **`xiaohongshu_summary`**: Platform-specific content analysis
+  - ✅ "summarize xiaohongshu posts about travel"
+  - ✅ "analyze xiaohongshu fashion content"
+
+- **`general_chat`**: General page summarization
+  - ✅ "summarize the page" (on any website)
+  - ✅ "what's on this page?"
 
 ## Architecture
 
