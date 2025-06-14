@@ -85,7 +85,7 @@ export class ChatUI {
     header.innerHTML = `
       <span>${headerTitle}</span>
       <div class="header-controls">
-        <span class="chatbrowse-resize-btn" title="Toggle size presets">⌄</span>
+        <span class="chatbrowse-resize-btn" title="Resize window (⤢)">⤢</span>
         <span class="chatbrowse-close" title="Close chat">&times;</span>
       </div>
     `;
