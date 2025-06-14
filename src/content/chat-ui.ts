@@ -633,16 +633,14 @@ export class ChatUI {
     const currentWidth = chatPanel.offsetWidth;
     const currentHeight = chatPanel.offsetHeight;
     
-    // Define size presets: [width, height]
+    // Define size presets: [width, height] - only keep second smallest and largest
     const sizePresets = [
-      [400, 500],   // Small
-      [450, 600],   // Default
-      [550, 700],   // Large
-      [650, 750]    // Extra Large
+      [450, 600],   // Default (second smallest)
+      [650, 750]    // Extra Large (largest)
     ];
     
     // Find current preset or closest match
-    let currentPresetIndex = 1; // Default to medium
+    let currentPresetIndex = 0; // Default to first preset
     for (let i = 0; i < sizePresets.length; i++) {
       const [width, height] = sizePresets[i];
       if (Math.abs(currentWidth - width) < 50 && Math.abs(currentHeight - height) < 50) {

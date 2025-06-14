@@ -5,33 +5,29 @@
 ### 1. **Content Script Chat Window**
 - **Resizable**: Drag the corners to resize (CSS `resize: both`)
 - **Draggable**: Click and drag the header to move the window
-- **Size Presets**: Click the `⤢` button to cycle through preset sizes:
-  - Small: 400×500px
-  - Default: 450×600px  
-  - Large: 550×700px
-  - Extra Large: 650×750px
+- **Size Presets**: Click the `⤢` button to cycle between two sizes:
+  - Default: 450×600px (compact)
+  - Large: 650×750px (expanded)
 - **Persistent**: Remembers size and position between sessions
 - **Boundaries**: Stays within viewport bounds when dragging
 
 ### 2. **Popup Window**
-- **Size Cycling**: Click the `⤢` button in header to change size
-- **Preset Sizes**:
-  - Small: 400×500px
-  - Default: 450×600px
-  - Large: 550×700px
-  - Extra Large: 650×800px
+- **Size Cycling**: Click the `⤢` button in header to toggle between sizes
+- **Two Sizes**:
+  - Default: 450×600px (compact)
+  - Large: 650×800px (expanded)
 - **Persistent**: Remembers size preference
 
 ## 🎯 How to Use
 
 ### Content Script (In-page Chat):
 1. **Resize manually**: Drag from bottom-right corner
-2. **Quick resize**: Click the diagonal arrow `⤢` in header
+2. **Quick toggle**: Click the diagonal arrow `⤢` in header to toggle between compact and expanded
 3. **Move window**: Drag the header area (avoid buttons)
 4. **Your settings are saved automatically**
 
 ### Popup:
-1. **Cycle sizes**: Click the `⤢` button next to refresh
+1. **Toggle sizes**: Click the `⤢` button next to refresh to switch between compact and expanded
 2. **Size persists**: Reopen popup to see saved size
 
 ## 🔧 Technical Implementation
@@ -74,3 +70,12 @@
 - **Smooth Transitions**: Animated size changes
 
 The chat UI is now fully adjustable and user-friendly! 🚀 
+
+### 🎯 **Size Options:**
+- **Compact**: 450×600px (balanced viewing)
+- **Expanded**: 650×750px/800px (more space for content)
+
+### 🔧 **Technical Features:**
+- **Toggle Button**: `⤢` icon for quick size switching
+- **Manual Resize**: Drag corners for custom sizes
+- **Smart Memory**: Remembers your preferred size and position 

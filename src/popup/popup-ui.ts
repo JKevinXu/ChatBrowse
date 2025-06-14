@@ -453,19 +453,17 @@ export class PopupUI {
   }
 
   private cycleWindowSize(): void {
-    // Define size presets: [width, height]
+    // Define size presets: [width, height] - only keep second smallest and largest
     const sizePresets = [
-      [400, 500],   // Small
-      [450, 600],   // Default
-      [550, 700],   // Large
-      [650, 800]    // Extra Large
+      [450, 600],   // Default (second smallest)
+      [650, 800]    // Extra Large (largest)
     ];
     
     const currentWidth = document.body.offsetWidth;
     const currentHeight = document.body.offsetHeight;
     
     // Find current preset or closest match
-    let currentPresetIndex = 1; // Default to medium
+    let currentPresetIndex = 0; // Default to first preset
     for (let i = 0; i < sizePresets.length; i++) {
       const [width, height] = sizePresets[i];
       if (Math.abs(currentWidth - width) < 50 && Math.abs(currentHeight - height) < 50) {
