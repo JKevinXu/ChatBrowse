@@ -32,24 +32,35 @@ export class MessageHandler {
         sendResponse({ received: true });
       }
 
-      // Handle multi-part responses (like Xiaohongshu summarization)
+      // Handle multi-part responses (like Google search results and AI summaries)
       if (request.type === 'MESSAGE' && request.payload && request.payload.sessionId) {
         console.log('🐛 POPUP DEBUG: Received multi-part response:', request);
         
-        // Hide typing indicator and show processing for long operations
+        // Hide typing indicator for any incoming message
         if (this.ui) {
           this.ui.hideTypingIndicator();
           
-          // If this looks like a progress message, show it as processing
+          // Improved progress message detection - only filter out very specific progress messages
           const text = request.payload.text;
-          const isProgressMessage = text.includes('Searching') || text.includes('Extracting') || text.includes('Analyzing');
+          const isProgressMessage = (
+            // Initial search messages
+            (text.includes('Searching') && text.includes('for') && text.length < 100) ||
+            // Extraction progress messages (but not results)
+            (text.includes('Extracting') && !text.includes('Result') && !text.includes('📊') && text.length < 100) ||
+            // AI generation progress (but not actual AI responses)
+            (text.includes('Generating AI analysis') && !text.includes('**AI Analysis**') && text.length < 100) ||
+            // Navigation messages
+            (text.includes('Successfully navigated') && text.length < 200)
+          );
           
           if (isProgressMessage) {
+            console.log('🔄 POPUP DEBUG: Showing as processing indicator:', text.substring(0, 50));
             this.ui.showProcessingIndicator(text);
             // Don't add progress messages to chat history - they're shown as processing indicators
             sendResponse({ received: true });
             return;
           } else {
+            console.log('✅ POPUP DEBUG: Adding as chat message:', text.substring(0, 50));
             this.ui.hideProcessingIndicator();
           }
         }

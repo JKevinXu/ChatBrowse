@@ -109,10 +109,12 @@ class ContentScript {
           this.handleTestImageExtraction(sendResponse);
           return true;
           
-        // Handle ongoing messages from search operations
+        // Handle ongoing messages from search operations and other background processes
         case 'MESSAGE':
-          console.log('📨 CONTENT: Received ongoing MESSAGE from background');
+          console.log('📨 CONTENT: Received MESSAGE from background');
+          console.log('📨 CONTENT: Message payload:', request.payload);
           if (request.payload && request.payload.text) {
+            console.log('✅ CONTENT: Valid message payload, adding to chat');
             this.chatUI.hideTypingIndicator();
             this.chatUI.addMessageToChat({
               id: Date.now().toString(),
@@ -120,6 +122,9 @@ class ContentScript {
               sender: 'system',
               timestamp: Date.now()
             });
+            console.log('✅ CONTENT: Message added to chat interface');
+          } else {
+            console.log('⚠️ CONTENT: Invalid message payload');
           }
           sendResponse({ received: true });
           return true;

@@ -11,12 +11,19 @@ class PopupApp {
   constructor() {
     console.log('🔧 PopupApp: Constructor starting...');
     this.sessionManager = new SessionManager();
-    this.messageHandler = new MessageHandler();
+    this.messageHandler = new MessageHandler((message) => {
+      console.log('📨 PopupApp: Received message from handler:', message);
+      this.handleIncomingMessage(message);
+    });
     this.ui = new PopupUI(
       (text: string) => this.handleUserMessage(text),
       () => this.handleSettings(),
       () => this.handleNewConversation()
     );
+    
+    // Connect the message handler to the UI for processing indicators
+    this.messageHandler.setUI(this.ui);
+    
     console.log('🔧 PopupApp: Constructor completed');
     
     this.initialize();

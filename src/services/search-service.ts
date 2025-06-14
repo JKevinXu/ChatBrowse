@@ -54,20 +54,67 @@ export class SearchService {
   ): Promise<void> {
     const { query, engine } = searchCommand;
     
-    console.log(`Searching ${engine} for: "${query}"`);
+    console.log(`🔍 [SearchService] Starting ${engine} search for: "${query}"`);
+    console.log(`🔍 [SearchService] Original chat tab ID: ${tabId}`);
+    console.log(`🔍 [SearchService] Session ID: ${sessionId}`);
     
-    // Send immediate feedback
-    sendResponse({
-      type: 'MESSAGE',
+    // Store the original chat tab ID
+    const originalChatTabId = tabId;
+    
+    // Send immediate feedback - this is the ONLY time we can use sendResponse
+    const initialResponse = {
+      type: 'MESSAGE' as const,
       payload: {
         text: `Searching ${engine} for "${query}"...`,
         sessionId
       }
-    });
+    };
+    
+    console.log(`📤 [SearchService] Sending initial response:`, initialResponse);
+    sendResponse(initialResponse);
+
+    // Create a follow-up message sender that doesn't rely on the callback
+    const sendFollowUpMessage = (message: string) => {
+      const followUpResponse = {
+        type: 'MESSAGE' as const,
+        payload: {
+          text: message,
+          sessionId
+        }
+      };
+      
+      console.log(`📤 [SearchService] Broadcasting follow-up message:`, followUpResponse);
+      
+      // Send to original chat tab if available
+      if (originalChatTabId) {
+        chrome.tabs.sendMessage(originalChatTabId, followUpResponse).catch(() => {
+          console.log('💡 Could not send to original chat tab (this is normal if using popup)');
+        });
+      }
+      
+      // Send to all tabs with ChatBrowse content script
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.id && tab.id !== originalChatTabId) {
+            chrome.tabs.sendMessage(tab.id, followUpResponse).catch(() => {
+              // Silently fail - not all tabs have content script
+            });
+          }
+        });
+      });
+      
+      // Send to popup if open
+      chrome.runtime.sendMessage(followUpResponse).catch(() => {
+        console.log('💡 Could not send to popup (this is normal if popup is closed)');
+      });
+    };
 
     try {
       const url = this.searchUrls[engine](query);
+      console.log(`🌐 [SearchService] Search URL: ${url}`);
+      
       const result = await this.performSearch(url, tabId);
+      console.log(`📊 [SearchService] Search result:`, result);
       
       // Send success message back to chat
       if (result?.success) {
@@ -81,6 +128,8 @@ export class SearchService {
             successMessage = `✅ Opened Xiaohongshu search results for "${query}" in a new tab.`;
           }
           successMessage += `\n\n📱 Browse the results or ask me to "summarize xiaohongshu posts about ${query}" to extract and analyze them.`;
+          
+          sendFollowUpMessage(successMessage);
         } else if (engine === 'google') {
           if (result.newTab && result.background) {
             successMessage = `✅ Opened Google search for "${query}" in a background tab.`;
@@ -93,48 +142,25 @@ export class SearchService {
           }
           
           // Send navigation success message
-          sendResponse({
-            type: 'MESSAGE',
-            payload: {
-              text: successMessage,
-              sessionId
-            }
-          });
+          sendFollowUpMessage(successMessage);
           
           // Start the extraction and summarization process for Google
-          // Use the new tab ID if available, otherwise fall back to original tabId
+          // IMPORTANT: Use the new tab ID for extraction, but keep original tab ID for responses
           const extractionTabId = result.tabId || tabId;
-          await this.handleGoogleSearchExtraction(query, extractionTabId, sendResponse, sessionId);
+          console.log(`🔍 [SearchService] Starting extraction - Extraction tab: ${extractionTabId}, Original tab: ${originalChatTabId}`);
+          
+          await this.handleGoogleSearchExtraction(query, extractionTabId, sendFollowUpMessage, sessionId, originalChatTabId);
           return;
         } else {
           successMessage += `\n\n📱 Browse the results manually or ask me to help extract information.`;
+          sendFollowUpMessage(successMessage);
         }
-        
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: successMessage,
-            sessionId
-          }
-        });
       } else {
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: `❌ Failed to search ${engine}: ${result.error || 'Unknown error'}`,
-            sessionId
-          }
-        });
+        sendFollowUpMessage(`❌ Failed to search ${engine}: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error(`Search error for ${engine}:`, error);
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `❌ Search failed: ${(error as Error).message}`,
-          sessionId
-        }
-      });
+      console.error(`❌ [SearchService] Search error for ${engine}:`, error);
+      sendFollowUpMessage(`❌ Search failed: ${(error as Error).message}`);
     }
   }
 
@@ -209,22 +235,18 @@ export class SearchService {
   private async handleGoogleSearchExtraction(
     query: string,
     tabId: number | undefined,
-    sendResponse: (response: ChatResponse) => void,
-    sessionId: string
+    sendMessage: (response: string) => void,
+    sessionId: string,
+    originalChatTabId?: number
   ): Promise<void> {
     try {
       console.log('🔍 Starting Google search result extraction for:', query);
-      console.log('🔍 Tab ID for extraction:', tabId);
+      console.log('🔍 Extraction tab ID:', tabId);
+      console.log('🔍 Original chat tab ID:', originalChatTabId);
       
       if (!tabId) {
         console.error('❌ No tab ID provided for Google extraction');
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: `⚠️ Cannot extract Google results: No tab ID available`,
-            sessionId
-          }
-        });
+        sendMessage(`⚠️ Cannot extract Google results: No tab ID available`);
         return;
       }
       
@@ -232,13 +254,7 @@ export class SearchService {
       console.log('⏳ Waiting for Google page to load...');
       await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait time to 5 seconds
       
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `📤 Extracting search results from Google...`,
-          sessionId
-        }
-      });
+      sendMessage(`📤 Extracting search results from Google...`);
       
       console.log('🚀 Starting Google results extraction with tab ID:', tabId);
       
@@ -247,9 +263,27 @@ export class SearchService {
       
       console.log('📊 Extraction result received:', extractionResult);
       
-      // Fix: Access the nested result structure
-      const actualResult = extractionResult?.result || extractionResult;
-      const isSuccess = extractionResult?.success && actualResult?.posts && actualResult.posts.length > 0;
+      // Fix: Handle Chrome scripting API result structure correctly
+      let actualResult;
+      let isSuccess = false;
+      
+      if (extractionResult && extractionResult.result) {
+        // Chrome scripting API returns: { documentId, frameId, result: actualData }
+        actualResult = extractionResult.result;
+        isSuccess = actualResult && actualResult.posts && actualResult.posts.length > 0;
+        console.log('✅ Using Chrome scripting API result structure');
+      } else if (extractionResult && extractionResult.posts) {
+        // Direct result structure
+        actualResult = extractionResult;
+        isSuccess = actualResult.posts && actualResult.posts.length > 0;
+        console.log('✅ Using direct result structure');
+      } else {
+        console.log('❌ Unexpected result structure:', extractionResult);
+        actualResult = null;
+        isSuccess = false;
+      }
+      
+      console.log('📊 Parsed result - Success:', isSuccess, 'Posts count:', actualResult?.posts?.length || 0);
       
       if (isSuccess) {
         console.log('✅ Google extraction successful, posts found:', actualResult.posts.length);
@@ -259,98 +293,33 @@ export class SearchService {
         const formattedResults = this.formatGoogleResults(actualResult, query);
         console.log('📋 Formatted results length:', formattedResults.length);
         
-        // Send formatted results via both methods
-        const resultsResponse = {
-          type: 'MESSAGE' as const,
-          payload: {
-            text: formattedResults,
-            sessionId
-          }
-        };
-        
-        sendResponse(resultsResponse);
+        // Send formatted results
+        sendMessage(formattedResults);
         console.log('📤 Formatted results sent to chat interface');
-        
-        // Also send directly to content script
-        chrome.tabs.sendMessage(tabId, resultsResponse).catch(() => {
-          console.log('💡 Could not send direct message to content script (this is normal if using popup)');
-        });
-        
-        // Send to popup as well (for popup users)
-        chrome.runtime.sendMessage(resultsResponse).catch(() => {
-          console.log('💡 Could not send message to popup (this is normal if popup is closed)');
-        });
         
         // Optional: Also provide AI summary
         setTimeout(async () => {
           try {
             console.log('🤖 Starting AI summary generation...');
-            const progressResponse = {
-              type: 'MESSAGE' as const,
-              payload: {
-                text: `🤖 Generating AI analysis of the search results...`,
-                sessionId
-              }
-            };
+            sendMessage(`🤖 Generating AI analysis of the search results...`);
             
-            sendResponse(progressResponse);
-            
-            // Also send progress directly to content script
-            chrome.tabs.sendMessage(tabId, progressResponse).catch(() => {
-              console.log('💡 Could not send progress message to content script (this is normal if using popup)');
-            });
-            
-            // Send progress to popup as well
-            chrome.runtime.sendMessage(progressResponse).catch(() => {
-              console.log('💡 Could not send progress message to popup (this is normal if popup is closed)');
-            });
-            
-            await this.generateGoogleResultsSummary(actualResult, query, sendResponse, sessionId, tabId);
+            await this.generateGoogleResultsSummary(actualResult, query, sendMessage, sessionId, originalChatTabId);
           } catch (summaryError) {
             console.error('❌ Google summary error:', summaryError);
-            const errorResponse = {
-              type: 'MESSAGE' as const,
-              payload: {
-                text: `⚠️ Results extracted successfully, but AI summary failed: ${(summaryError as Error).message}`,
-                sessionId
-              }
-            };
-            
-            sendResponse(errorResponse);
-            
-            // Also send error directly to content script
-            chrome.tabs.sendMessage(tabId, errorResponse).catch(() => {
-              console.log('💡 Could not send error message to content script (this is normal if using popup)');
-            });
-            
-            // Send error to popup as well
-            chrome.runtime.sendMessage(errorResponse).catch(() => {
-              console.log('💡 Could not send error message to popup (this is normal if popup is closed)');
-            });
+            sendMessage(`⚠️ Results extracted successfully, but AI summary failed: ${(summaryError as Error).message}`);
           }
         }, 1000);
         
       } else {
         console.error('❌ Google extraction failed or no results found');
-        console.error('❌ Extraction result:', extractionResult);
-        sendResponse({
-          type: 'MESSAGE',
-          payload: {
-            text: `⚠️ Could not extract search results from Google. This may be due to anti-bot protections or page structure changes. You can browse the results manually.`,
-            sessionId
-          }
-        });
+        console.error('❌ Extraction result structure:', extractionResult);
+        console.error('❌ Parsed actual result:', actualResult);
+        sendMessage(`⚠️ Could not extract search results from Google. This may be due to anti-bot protections or page structure changes. You can browse the results manually.`);
       }
       
     } catch (error) {
       console.error('❌ Google search extraction error:', error);
-      sendResponse({
-        type: 'MESSAGE',
-        payload: {
-          text: `❌ Failed to extract Google results: ${(error as Error).message}`,
-          sessionId
-        }
-      });
+      sendMessage(`❌ Failed to extract Google results: ${(error as Error).message}`);
     }
   }
 
@@ -596,7 +565,29 @@ export class SearchService {
           resolve({ success: false, error: chrome.runtime.lastError.message });
         } else if (results && results[0]) {
           console.log('✅ Extraction successful, result:', results[0]);
-          resolve({ success: true, ...results[0] });
+          
+          // Handle Chrome scripting API result structure
+          const scriptResult = results[0] as any;
+          
+          // Check if we have a valid result structure
+          if (scriptResult && scriptResult.result) {
+            const extractedData = scriptResult.result;
+            console.log('🔍 Checking extracted data structure:', extractedData);
+            
+            if (extractedData && extractedData.posts && extractedData.posts.length > 0) {
+              console.log('✅ Posts found in extraction result:', extractedData.posts.length);
+              // Return the Chrome scripting API structure (will be parsed later)
+              resolve(scriptResult);
+            } else {
+              console.error('❌ No posts found in extraction result');
+              console.error('❌ Extracted data:', extractedData);
+              resolve({ success: false, error: 'No posts found in extraction result' });
+            }
+          } else {
+            console.error('❌ Invalid Chrome scripting result structure');
+            console.error('❌ Script result:', scriptResult);
+            resolve({ success: false, error: 'Invalid result structure from script' });
+          }
         } else {
           console.error('❌ No results returned or invalid format');
           console.error('❌ Full results object:', results);
@@ -626,9 +617,9 @@ export class SearchService {
   private async generateGoogleResultsSummary(
     extractionResult: any,
     query: string,
-    sendResponse: (response: ChatResponse) => void,
+    sendMessage: (response: string) => void,
     sessionId: string,
-    tabId: number | undefined
+    originalChatTabId?: number
   ): Promise<void> {
     try {
       console.log('🤖 generateGoogleResultsSummary: Starting AI summary generation');
@@ -653,51 +644,12 @@ export class SearchService {
         
         if (aiResponse && aiResponse.type === 'MESSAGE' && aiResponse.payload?.text) {
           console.log('✅ generateGoogleResultsSummary: Valid AI response received, sending summary');
-          const summaryResponse = {
-            type: 'MESSAGE' as const,
-            payload: {
-              text: `🤖 **AI Analysis of Google Search Results:**\n\n${aiResponse.payload.text}`,
-              sessionId
-            }
-          };
-          
-          sendResponse(summaryResponse);
-          console.log('📤 generateGoogleResultsSummary: Summary response sent');
-          
-          // Also send directly to content script
-          if (tabId) {
-            chrome.tabs.sendMessage(tabId, summaryResponse).catch(() => {
-              console.log('💡 Could not send AI summary to content script (this is normal if using popup)');
-            });
-          }
-          
-          // Send summary to popup as well
-          chrome.runtime.sendMessage(summaryResponse).catch(() => {
-            console.log('💡 Could not send AI summary to popup (this is normal if popup is closed)');
-          });
+          const summaryText = `🤖 **AI Analysis of Google Search Results:**\n\n${aiResponse.payload.text}`;
+          sendMessage(summaryText);
+          console.log('📤 generateGoogleResultsSummary: Summary sent');
         } else {
           console.log('❌ generateGoogleResultsSummary: Invalid AI response, sending fallback');
-          const fallbackResponse = {
-            type: 'MESSAGE' as const,
-            payload: {
-              text: `⚠️ AI analysis unavailable for these Google search results.`,
-              sessionId
-            }
-          };
-          
-          sendResponse(fallbackResponse);
-          
-          // Also send fallback directly to content script
-          if (tabId) {
-            chrome.tabs.sendMessage(tabId, fallbackResponse).catch(() => {
-              console.log('💡 Could not send fallback message to content script (this is normal if using popup)');
-            });
-          }
-          
-          // Send fallback to popup as well
-          chrome.runtime.sendMessage(fallbackResponse).catch(() => {
-            console.log('💡 Could not send fallback message to popup (this is normal if popup is closed)');
-          });
+          sendMessage(`⚠️ AI analysis unavailable for these Google search results.`);
         }
       });
       console.log('✅ generateGoogleResultsSummary: llmService.handleChat call completed');
