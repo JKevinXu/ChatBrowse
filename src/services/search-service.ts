@@ -205,7 +205,7 @@ export class SearchService {
         const isGoogle = url.includes('google.com');
         chrome.tabs.create({ 
           url, 
-          active: !isGoogle  // Google: background tab, Xiaohongshu: background tab
+          active: false  // Both Google and Xiaohongshu open in background to preserve chat session
         }, (newTab) => {
           if (chrome.runtime.lastError) {
             resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -214,7 +214,7 @@ export class SearchService {
               success: true, 
               url, 
               newTab: true, 
-              background: !isGoogle,  // Google opens in background for extraction
+              background: true,  // Both open in background
               tabId: newTab.id
             });
           }
