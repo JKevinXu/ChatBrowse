@@ -1,8 +1,9 @@
 import { LLMService } from './llm-service';
 import { ConfigService } from './config-service';
+import { IntentType, IntentConfig, DEFAULT_INTENT, VALID_INTENTS } from '../config/intent-config';
 
 export interface IntentResult {
-  intent: 'action_execution' | 'navigation' | 'search' | 'xiaohongshu_summary' | 'xiaohongshu_extract' | 'action_planning' | 'general_chat';
+  intent: IntentType;
   confidence: number;
   parameters?: {
     [key: string]: any;
@@ -149,22 +150,15 @@ Current Context:
 
     console.log('🌐 [IntentService] Context info section:', JSON.stringify(contextInfo));
 
+    // Use centralized configuration to generate prompt sections
+    const intentTypesSection = IntentConfig.generateLLMPromptSection();
+    const distinctionsSection = IntentConfig.generateIntentDistinctions();
+
     const prompt = `You are an intent classifier for a browser automation assistant. Analyze the user's input and classify it into one of these intents:
 
-INTENT TYPES:
-1. "action_execution" - User wants to execute a previously planned action (e.g., "do it", "execute", "run it", "go ahead", "proceed")
-2. "navigation" - User wants to navigate to a URL or platform (e.g., "go to google.com", "navigate to amazon", "login to xiaohongshu")
-3. "search" - User wants to search on a specific platform (e.g., "search google for cats", "find videos about cooking on bilibili", "xiaohongshu search fashion", "用小红书搜口袋黄", "小红书搜索时尚")
-4. "xiaohongshu_summary" - User wants to summarize Xiaohongshu content (e.g., "summarize xiaohongshu posts about travel", "sum up xiaohongshu fashion posts", "总结小红书旅游帖子")
-5. "xiaohongshu_extract" - User wants to extract Xiaohongshu posts (e.g., "extract xiaohongshu posts", "get posts from this page", "提取小红书帖子")
-6. "action_planning" - User wants to plan SPECIFIC UI actions on current page (e.g., "click bulk actions", "download data", "select items", "click the submit button", "fill out the form")
-7. "general_chat" - General conversation, questions, or content requests that don't fit other categories (e.g., "what's the weather?", "tell me a joke", "summarize the page", "explain this content", "what does this mean?")
+${intentTypesSection}
 
-IMPORTANT DISTINCTIONS:
-- "action_planning" is ONLY for specific UI interactions (clicking, selecting, downloading, form filling)
-- "general_chat" includes content analysis, page summarization, explanations, and general questions
-- "xiaohongshu_summary" is specifically for analyzing Xiaohongshu platform content
-- General page summarization requests like "summarize the page" should be "general_chat"
+${distinctionsSection}
 
 ${contextInfo}
 
@@ -201,16 +195,11 @@ RULES:
     console.log('🔧 [IntentService] Validating intent result');
     console.log('📋 [IntentService] Raw result to validate:', JSON.stringify(result));
 
-    const validIntents = [
-      'action_execution', 'navigation', 'search', 'xiaohongshu_summary', 
-      'xiaohongshu_extract', 'action_planning', 'general_chat'
-    ];
-
     const originalIntent = result.intent;
-    if (!result.intent || !validIntents.includes(result.intent)) {
+    if (!result.intent || !IntentConfig.isValidIntent(result.intent)) {
       console.log('⚠️ [IntentService] Invalid intent detected:', result.intent);
-      console.log('🔄 [IntentService] Changing to general_chat');
-      result.intent = 'general_chat';
+      console.log('🔄 [IntentService] Changing to default intent:', DEFAULT_INTENT);
+      result.intent = DEFAULT_INTENT;
     } else {
       console.log('✅ [IntentService] Intent is valid:', result.intent);
     }
@@ -231,8 +220,8 @@ RULES:
       console.log('✅ [IntentService] Parameters object exists:', JSON.stringify(result.parameters));
     }
 
-    const validatedResult = {
-      intent: result.intent,
+    const validatedResult: IntentResult = {
+      intent: result.intent as IntentType,
       confidence: result.confidence,
       parameters: result.parameters,
       reasoning: result.reasoning || 'No reasoning provided'
@@ -241,7 +230,7 @@ RULES:
     console.log('📊 [IntentService] Validation summary:');
     console.log('   Original intent:', originalIntent, '→', validatedResult.intent);
     console.log('   Original confidence:', originalConfidence, '→', validatedResult.confidence);
-    console.log('   Parameters count:', Object.keys(validatedResult.parameters).length);
+    console.log('   Parameters count:', Object.keys(validatedResult.parameters || {}).length);
     console.log('   Has reasoning:', !!validatedResult.reasoning);
 
     return validatedResult;

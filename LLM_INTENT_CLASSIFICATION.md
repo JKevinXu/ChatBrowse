@@ -4,6 +4,8 @@
 
 The ChatBrowse extension uses **LLM-powered intent classification** to understand user requests intelligently. The system requires a configured LLM provider and will throw errors if the LLM is unavailable.
 
+**🎯 Centralized Configuration**: All intent definitions are now managed in `/src/config/intent-config.ts` for consistency and maintainability.
+
 ## Key Features
 
 ### 🧠 **Intelligent Understanding**
@@ -26,7 +28,7 @@ The ChatBrowse extension uses **LLM-powered intent classification** to understan
 
 ## Intent Types
 
-The system classifies user input into these categories:
+The system classifies user input into these categories (defined in `src/config/intent-config.ts`):
 
 | Intent | Description | Examples |
 |--------|-------------|----------|
@@ -39,6 +41,8 @@ The system classifies user input into these categories:
 | `general_chat` | General conversation, questions, and content requests | "what's the weather?", "summarize the page", "explain this content" |
 
 ### Intent Classification Rules
+
+The classification rules and distinctions are automatically generated from the centralized configuration:
 
 #### **action_planning vs general_chat**
 - **`action_planning`**: Only for specific UI interactions
@@ -67,6 +71,9 @@ The system classifies user input into these categories:
 ### Core Components
 
 ```typescript
+// Centralized intent configuration
+import { IntentType, IntentConfig, INTENT_DEFINITIONS } from '../config/intent-config';
+
 // LLM-based intent service (no fallback)
 IntentService.classifyIntent(text: string, context?: {
   currentUrl?: string;
@@ -76,10 +83,34 @@ IntentService.classifyIntent(text: string, context?: {
 
 // Intent result with rich information
 interface IntentResult {
-  intent: string;
+  intent: IntentType;  // Now derived from centralized config
   confidence: number;
   parameters?: { [key: string]: any };
   reasoning?: string;
+}
+```
+
+### Centralized Configuration
+
+```typescript
+// src/config/intent-config.ts
+export const INTENT_DEFINITIONS: Record<string, IntentDefinition> = {
+  action_execution: {
+    id: 'action_execution',
+    name: 'Action Execution', 
+    description: 'User wants to execute a previously planned action',
+    examples: ['do it', 'execute', 'run it', 'go ahead', 'proceed'],
+    requiresContext: ['hasStoredActionPlan']
+  },
+  // ... other intents
+};
+
+// Utility functions for configuration management
+export class IntentConfig {
+  static getIntentDefinition(intentId: string): IntentDefinition | undefined
+  static isValidIntent(intent: string): intent is IntentType
+  static generateLLMPromptSection(): string
+  static generateIntentDistinctions(): string
 }
 ```
 
@@ -87,11 +118,37 @@ interface IntentResult {
 
 ```
 User Input → IntentService → LLM Classification → MessageRouter → Action Handler
+                    ↓                              ↓
+              [Uses centralized              [Uses centralized
+               configuration]                configuration for routing]
                     ↓
-              [If LLM fails]
+            [If LLM fails]
                     ↓
             Throw Error → Return Error Response
 ```
+
+## Benefits of Centralized Configuration
+
+### 🔧 **Maintainability**
+- Single source of truth for all intent definitions
+- Changes only need to be made in one place
+- Automatic synchronization across all components
+
+### 📋 **Consistency**
+- TypeScript types derived from configuration
+- LLM prompts generated from configuration  
+- Validation logic uses same definitions
+- Message routing uses same intent types
+
+### 🧪 **Testing**
+- Demo tests automatically generated from configuration
+- No need to manually update test cases when intents change
+- Comprehensive coverage of all defined intents
+
+### 🔄 **Extensibility**
+- Easy to add new intents by updating configuration
+- All components automatically pick up new intents
+- No need to modify multiple files for new intents
 
 ## Examples
 
@@ -110,7 +167,7 @@ User Input → IntentService → LLM Classification → MessageRouter → Action
 classifyIntent("do it", { hasStoredActionPlan: true })
 // → { intent: "action_execution", confidence: 0.95 }
 
-// Without stored action plan
+// Without stored action plan  
 classifyIntent("do it", { hasStoredActionPlan: false })
 // → { intent: "general_chat", confidence: 0.6 }
 ```
@@ -129,7 +186,48 @@ classifyIntent("search bilibili for cooking videos")
 //   }
 ```
 
-## Configuration
+## Configuration Management
+
+### Adding New Intents
+
+To add a new intent, simply update `src/config/intent-config.ts`:
+
+```typescript
+export const INTENT_DEFINITIONS: Record<string, IntentDefinition> = {
+  // ... existing intents
+  
+  new_intent: {
+    id: 'new_intent',
+    name: 'New Intent',
+    description: 'Description of what this intent handles',
+    examples: ['example command 1', 'example command 2'],
+    chineseExamples: ['中文例子'],  // Optional
+    parameters: ['param1', 'param2'],  // Optional
+    requiresContext: ['contextField']   // Optional
+  }
+};
+```
+
+Then add the handler in MessageRouter:
+
+```typescript
+private async routeToIntentHandler(intentResult: IntentResult, ...): Promise<boolean> {
+  switch (intentResult.intent) {
+    // ... existing cases
+    
+    case 'new_intent':
+      console.log('🆕 [MessageRouter] CASE: new_intent');
+      await this.newIntentService.handleNewIntent(text, tabId, sendResponse, sessionId);
+      return true;
+  }
+}
+```
+
+### Modifying Existing Intents
+
+Simply update the relevant entry in `INTENT_DEFINITIONS`. All components will automatically use the updated configuration.
+
+## Error Handling
 
 **IMPORTANT**: The system requires LLM configuration to function:
 
@@ -141,20 +239,15 @@ classifyIntent("search bilibili for cooking videos")
 - If no LLM provider is configured → Throws error
 - If LLM request fails → Throws error  
 - If LLM response is invalid → Throws error
+- If intent not found in configuration → Falls back to `general_chat`
 
 The extension will display error messages to users when LLM is unavailable.
 
-## Migration Notes
-
-- **Removed fallback classification**: System no longer falls back to rule-based patterns
-- **LLM dependency**: Extension now requires working LLM configuration
-- **Consistent behavior**: All intent classification uses the same intelligent approach
-
 ## Performance
 
-- **Latency**: ~200-500ms for LLM classification (vs ~1ms rule-based)
+- **Latency**: ~200-500ms for LLM classification
 - **Accuracy**: Significantly improved for natural language variations
-- **Reliability**: 100% uptime with fallback system
+- **Consistency**: 100% consistent across all components
 - **Cost**: Minimal token usage (~50-100 tokens per classification)
 
 ## Usage in Code
@@ -162,6 +255,7 @@ The extension will display error messages to users when LLM is unavailable.
 ### Basic Classification
 ```typescript
 import { IntentService } from './services/intent-service';
+import { IntentConfig } from './config/intent-config';
 
 const intentService = IntentService.getInstance();
 const result = await intentService.classifyIntent("search for cats");
@@ -169,14 +263,20 @@ const result = await intentService.classifyIntent("search for cats");
 console.log(result.intent);      // "search"
 console.log(result.confidence);  // 0.85
 console.log(result.parameters);  // { query: "cats", engine: "general" }
+
+// Validate intent using centralized config
+if (IntentConfig.isValidIntent(result.intent)) {
+  const definition = IntentConfig.getIntentDefinition(result.intent);
+  console.log(definition.description);
+}
 ```
 
 ### With Context
 ```typescript
 const result = await intentService.classifyIntent("do it", {
-  currentUrl: "https://youtube.com",
   hasStoredActionPlan: true,
-  pageTitle: "YouTube"
+  currentUrl: "https://example.com",
+  pageTitle: "Example Page"
 });
 ```
 
