@@ -8,13 +8,21 @@ export class PopupUI {
   private sendButton: HTMLElement | null = null;
   private settingsButton: HTMLElement | null = null;
   private newConversationButton: HTMLElement | null = null;
+  private resizeButton: HTMLElement | null = null;
   private onMessageSend?: (text: string) => void;
+  private onSettingsClick?: () => void;
   private onNewConversation?: () => void;
 
-  constructor(onMessageSend?: (text: string) => void, onNewConversation?: () => void) {
+  constructor(
+    onMessageSend?: (text: string) => void,
+    onSettingsClick?: () => void,
+    onNewConversation?: () => void
+  ) {
     this.onMessageSend = onMessageSend;
+    this.onSettingsClick = onSettingsClick;
     this.onNewConversation = onNewConversation;
     this.setupMarked();
+    this.initialize();
   }
 
   private setupMarked(): void {
@@ -28,6 +36,7 @@ export class PopupUI {
   initialize(): void {
     this.setupDOMElements();
     this.setupEventListeners();
+    this.loadWindowSize();
   }
 
   private setupDOMElements(): void {
@@ -36,6 +45,7 @@ export class PopupUI {
     this.sendButton = document.getElementById('sendButton');
     this.settingsButton = document.getElementById('settingsButton');
     this.newConversationButton = document.getElementById('newConversationButton');
+    this.resizeButton = document.getElementById('resizeButton');
   }
 
   private setupEventListeners(): void {
@@ -48,13 +58,19 @@ export class PopupUI {
     });
 
     this.settingsButton?.addEventListener('click', () => {
-      chrome.runtime.openOptionsPage();
+      if (this.onSettingsClick) {
+        this.onSettingsClick();
+      }
     });
 
     this.newConversationButton?.addEventListener('click', () => {
       if (this.onNewConversation) {
         this.onNewConversation();
       }
+    });
+
+    this.resizeButton?.addEventListener('click', () => {
+      this.cycleWindowSize();
     });
   }
 
@@ -434,5 +450,60 @@ export class PopupUI {
   setInputDisabled(disabled: boolean): void {
     if (!this.userInput) return;
     (this.userInput as HTMLInputElement).disabled = disabled;
+  }
+
+  private cycleWindowSize(): void {
+    // Define size presets: [width, height]
+    const sizePresets = [
+      [400, 500],   // Small
+      [450, 600],   // Default
+      [550, 700],   // Large
+      [650, 800]    // Extra Large
+    ];
+    
+    const currentWidth = document.body.offsetWidth;
+    const currentHeight = document.body.offsetHeight;
+    
+    // Find current preset or closest match
+    let currentPresetIndex = 1; // Default to medium
+    for (let i = 0; i < sizePresets.length; i++) {
+      const [width, height] = sizePresets[i];
+      if (Math.abs(currentWidth - width) < 50 && Math.abs(currentHeight - height) < 50) {
+        currentPresetIndex = i;
+        break;
+      }
+    }
+    
+    // Cycle to next preset
+    const nextPresetIndex = (currentPresetIndex + 1) % sizePresets.length;
+    const [newWidth, newHeight] = sizePresets[nextPresetIndex];
+    
+    // Apply new size
+    document.body.style.width = `${newWidth}px`;
+    document.body.style.height = `${newHeight}px`;
+    
+    // Save the size
+    this.saveWindowSize(newWidth, newHeight);
+  }
+
+  private loadWindowSize(): void {
+    const savedSize = localStorage.getItem('chatbrowse-popup-size');
+    if (savedSize) {
+      try {
+        const { width, height } = JSON.parse(savedSize);
+        document.body.style.width = `${width}px`;
+        document.body.style.height = `${height}px`;
+      } catch (error) {
+        console.log('Failed to load saved popup size:', error);
+      }
+    }
+  }
+
+  private saveWindowSize(width: number, height: number): void {
+    try {
+      localStorage.setItem('chatbrowse-popup-size', JSON.stringify({ width, height }));
+    } catch (error) {
+      console.log('Failed to save popup size:', error);
+    }
   }
 }

@@ -14,17 +14,21 @@
 }
 
 body {
-  width: 450px; /* Wider popup */
-  height: 600px; /* Taller popup */
+  width: 450px; /* Default width */
+  height: 600px; /* Default height */
+  min-width: 320px;
+  min-height: 400px;
   background-color: var(--bg-color);
   color: var(--text-color);
   overflow: hidden;
+  resize: both;
 }
 
 .chat-container {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 100%;
 }
 
 .header {
@@ -35,6 +39,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .header h1 {
@@ -49,7 +54,8 @@ body {
 }
 
 #settingsButton,
-#newConversationButton {
+#newConversationButton,
+#resizeButton {
   background: none;
   border: none;
   color: white;
@@ -61,12 +67,17 @@ body {
 }
 
 #settingsButton:hover,
-#newConversationButton:hover {
+#newConversationButton:hover,
+#resizeButton:hover {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
 #newConversationButton {
   font-size: 16px; /* Slightly smaller for the refresh icon */
+}
+
+#resizeButton {
+  font-size: 14px;
 }
 
 .chat-messages {

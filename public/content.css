@@ -37,6 +37,10 @@
   right: 0;
   width: 450px;
   height: 600px;
+  min-width: 320px;
+  min-height: 400px;
+  max-width: 800px;
+  max-height: 800px;
   background-color: white;
   border-radius: 12px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
@@ -44,10 +48,39 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.1);
+  resize: both;
 }
 
 .chatbrowse-chat.active {
   display: flex;
+}
+
+/* Resize handles */
+.chatbrowse-chat::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 4px,
+    #ccc 4px,
+    #ccc 6px,
+    transparent 6px,
+    transparent 10px,
+    #ccc 10px,
+    #ccc 12px,
+    transparent 12px,
+    transparent 16px,
+    #ccc 16px,
+    #ccc 18px,
+    transparent 18px
+  );
+  cursor: nw-resize;
+  pointer-events: none;
 }
 
 .chatbrowse-header {
@@ -60,6 +93,29 @@
   align-items: center;
   font-size: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: move; /* Make header draggable */
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.chatbrowse-header .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chatbrowse-resize-btn {
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  line-height: 1;
+  user-select: none;
+}
+
+.chatbrowse-resize-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .chatbrowse-close {

@@ -11,58 +11,40 @@ class PopupApp {
   constructor() {
     console.log('🔧 PopupApp: Constructor starting...');
     this.sessionManager = new SessionManager();
+    this.messageHandler = new MessageHandler();
     this.ui = new PopupUI(
-      (text) => this.handleUserMessage(text),
+      (text: string) => this.handleUserMessage(text),
+      () => this.handleSettings(),
       () => this.handleNewConversation()
     );
-    this.messageHandler = new MessageHandler((message) => this.handleIncomingMessage(message));
     console.log('🔧 PopupApp: Constructor completed');
+    
+    this.initialize();
   }
 
   async initialize(): Promise<void> {
-    console.log('🚀 PopupApp: Initialize starting...');
+    console.log('🚀 PopupApp: Initializing...');
     
     try {
-      console.log('🔧 PopupApp: Initializing UI...');
-      this.ui.initialize();
-      console.log('✅ PopupApp: UI initialized successfully');
-
-      // Connect UI to message handler for loading indicators
-      this.messageHandler.setUI(this.ui);
-
-      console.log('🔧 PopupApp: Getting current tab...');
-      // Get current tab and load session
+      // Load or create session for the current tab
       const tabs = await this.sessionManager.getCurrentTab();
-      console.log('🔧 PopupApp: Tabs received:', tabs);
-      
-      if (tabs && tabs.length > 0) {
-        const currentTab = tabs[0];
-        const tabUrl = currentTab.url || '';
-        const tabTitle = currentTab.title || 'Untitled Page';
+      if (tabs.length > 0) {
+        const tab = tabs[0];
+        const session = await this.sessionManager.loadOrCreateSession(tab.url || '', tab.title || '');
+        console.log('✅ PopupApp: Session loaded:', {
+          id: session.id,
+          url: session.url,
+          messagesCount: session.messages.length
+        });
         
-        console.log('🔧 PopupApp: Current tab info:', { url: tabUrl, title: tabTitle, id: currentTab.id });
-        
-        console.log('🔧 PopupApp: Loading or creating session...');
-        const session = await this.sessionManager.loadOrCreateSession(tabUrl, tabTitle);
-        console.log('✅ PopupApp: Session loaded/created:', { id: session.id, messagesCount: session.messages.length });
-        
-        console.log('🔧 PopupApp: Rendering messages...');
+        // Render existing messages
         this.renderMessages(session.messages);
-        console.log('✅ PopupApp: Messages rendered successfully');
       } else {
-        console.log('⚠️ PopupApp: No active tabs found, using fallback session');
-        // Fallback session
-        const fallbackSession = await this.sessionManager.loadOrCreateSession('', 'ChatBrowse');
-        console.log('✅ PopupApp: Fallback session created:', { id: fallbackSession.id, messagesCount: fallbackSession.messages.length });
-        this.renderMessages(fallbackSession.messages);
+        console.error('❌ PopupApp: No active tab found');
       }
     } catch (error) {
-      console.error('❌ PopupApp: Initialization failed:', error);
+      console.error('❌ PopupApp: Initialization error:', error);
     }
-
-    console.log('🔧 PopupApp: Focusing input...');
-    this.focusInput();
-    console.log('✅ PopupApp: Initialize completed');
   }
 
   private renderMessages(messages: any[]): void {
@@ -207,6 +189,10 @@ class PopupApp {
       const errorMessage = createMessage('Failed to start new conversation. Please try again.', 'system');
       this.ui.addMessageToChat(errorMessage);
     }
+  }
+
+  private handleSettings(): void {
+    chrome.runtime.openOptionsPage();
   }
 }
 

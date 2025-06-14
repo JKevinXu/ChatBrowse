@@ -78,15 +78,38 @@ export class ChatUI {
     chatPanel.className = 'chatbrowse-chat';
     console.log('🔧 ContentScript ChatUI: Created chat panel (hidden by default)');
     
-    // Create header with dynamic title
+    // Create header with dynamic title and controls
     const header = document.createElement('div');
     header.className = 'chatbrowse-header';
     const headerTitle = this.isXiaohongshuPage ? 'ChatBrowse - Xiaohongshu' : 'ChatBrowse';
     header.innerHTML = `
       <span>${headerTitle}</span>
-      <span class="chatbrowse-close">&times;</span>
+      <div class="header-controls">
+        <span class="chatbrowse-resize-btn" title="Toggle size presets">⌄</span>
+        <span class="chatbrowse-close" title="Close chat">&times;</span>
+      </div>
     `;
-    header.querySelector('.chatbrowse-close')?.addEventListener('click', () => this.toggleChat());
+    
+    // Add event listeners for header controls
+    const resizeBtn = header.querySelector('.chatbrowse-resize-btn');
+    const closeBtn = header.querySelector('.chatbrowse-close');
+    
+    if (resizeBtn) {
+      resizeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.cycleChatSize(chatPanel);
+      });
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleChat();
+      });
+    }
+    
+    // Make header draggable
+    this.makeDraggable(chatPanel, header);
     
     // Create messages container
     const messagesContainer = document.createElement('div');
@@ -118,6 +141,9 @@ export class ChatUI {
     document.body.appendChild(this.chatContainer);
     console.log('🔧 ContentScript ChatUI: Chat interface added to document body');
     console.log('🔧 ContentScript ChatUI: Toggle button visible, chat panel hidden by default');
+    
+    // Store size settings
+    this.loadChatSize(chatPanel);
   }
 
   private setupEventListeners(): void {
@@ -558,25 +584,126 @@ export class ChatUI {
     let offsetY = 0;
 
     header.addEventListener('mousedown', (e) => {
+      // Don't drag if clicking on control buttons
+      if ((e.target as HTMLElement).classList.contains('chatbrowse-resize-btn') || 
+          (e.target as HTMLElement).classList.contains('chatbrowse-close')) {
+        return;
+      }
+      
       isDragging = true;
       offsetX = e.clientX - element.getBoundingClientRect().left;
       offsetY = e.clientY - element.getBoundingClientRect().top;
       element.style.cursor = 'move';
+      document.body.style.userSelect = 'none';
     });
 
     document.addEventListener('mousemove', (e) => {
       if (isDragging) {
         const x = e.clientX - offsetX;
         const y = e.clientY - offsetY;
-        element.style.left = `${x}px`;
-        element.style.top = `${y}px`;
+        
+        // Keep window within viewport bounds
+        const maxX = window.innerWidth - element.offsetWidth;
+        const maxY = window.innerHeight - element.offsetHeight;
+        
+        const finalX = Math.max(0, Math.min(maxX, x));
+        const finalY = Math.max(0, Math.min(maxY, y));
+        
+        element.style.left = `${finalX}px`;
+        element.style.top = `${finalY}px`;
+        element.style.right = 'auto';
+        element.style.bottom = 'auto';
       }
     });
 
     document.addEventListener('mouseup', () => {
-      isDragging = false;
-      element.style.cursor = 'default';
+      if (isDragging) {
+        isDragging = false;
+        element.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+        
+        // Save the final position
+        const rect = element.getBoundingClientRect();
+        this.saveChatPosition(rect.left, rect.top);
+      }
     });
+  }
+
+  private cycleChatSize(chatPanel: HTMLElement): void {
+    const currentWidth = chatPanel.offsetWidth;
+    const currentHeight = chatPanel.offsetHeight;
+    
+    // Define size presets: [width, height]
+    const sizePresets = [
+      [400, 500],   // Small
+      [450, 600],   // Default
+      [550, 700],   // Large
+      [650, 750]    // Extra Large
+    ];
+    
+    // Find current preset or closest match
+    let currentPresetIndex = 1; // Default to medium
+    for (let i = 0; i < sizePresets.length; i++) {
+      const [width, height] = sizePresets[i];
+      if (Math.abs(currentWidth - width) < 50 && Math.abs(currentHeight - height) < 50) {
+        currentPresetIndex = i;
+        break;
+      }
+    }
+    
+    // Cycle to next preset
+    const nextPresetIndex = (currentPresetIndex + 1) % sizePresets.length;
+    const [newWidth, newHeight] = sizePresets[nextPresetIndex];
+    
+    // Apply new size
+    chatPanel.style.width = `${newWidth}px`;
+    chatPanel.style.height = `${newHeight}px`;
+    
+    // Save the size
+    this.saveChatSize(newWidth, newHeight);
+  }
+
+  private loadChatSize(chatPanel: HTMLElement): void {
+    const savedSize = localStorage.getItem('chatbrowse-size');
+    if (savedSize) {
+      try {
+        const { width, height } = JSON.parse(savedSize);
+        chatPanel.style.width = `${width}px`;
+        chatPanel.style.height = `${height}px`;
+      } catch (error) {
+        console.log('Failed to load saved chat size:', error);
+      }
+    }
+    
+    // Also load saved position
+    const savedPosition = localStorage.getItem('chatbrowse-position');
+    if (savedPosition) {
+      try {
+        const { left, top } = JSON.parse(savedPosition);
+        chatPanel.style.left = `${left}px`;
+        chatPanel.style.top = `${top}px`;
+        chatPanel.style.right = 'auto';
+        chatPanel.style.bottom = 'auto';
+      } catch (error) {
+        console.log('Failed to load saved chat position:', error);
+      }
+    }
+  }
+
+  private saveChatSize(width: number, height: number): void {
+    try {
+      localStorage.setItem('chatbrowse-size', JSON.stringify({ width, height }));
+    } catch (error) {
+      console.log('Failed to save chat size:', error);
+    }
+  }
+
+  private saveChatPosition(left: number, top: number): void {
+    try {
+      localStorage.setItem('chatbrowse-position', JSON.stringify({ left, top }));
+    } catch (error) {
+      console.log('Failed to save chat position:', error);
+    }
   }
 
   showTypingIndicator(): void {
