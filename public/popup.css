@@ -4,6 +4,12 @@
   --text-color: #333333;
   --secondary-bg: #f5f8ff;
   --border-color: #e1e4e8;
+  
+  /* Popup size presets */
+  --popup-width-default: 450px;
+  --popup-height-default: 600px;
+  --popup-width-large: 650px;
+  --popup-height-large: 800px;
 }
 
 * {
@@ -14,14 +20,26 @@
 }
 
 body {
-  width: 450px; /* Default width */
-  height: 600px; /* Default height */
+  width: var(--popup-width-default);
+  height: var(--popup-height-default);
   min-width: 320px;
   min-height: 400px;
   background-color: var(--bg-color);
   color: var(--text-color);
   overflow: hidden;
   resize: both;
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+/* Size preset classes */
+body.size-default {
+  width: var(--popup-width-default);
+  height: var(--popup-height-default);
+}
+
+body.size-large {
+  width: var(--popup-width-large);
+  height: var(--popup-height-large);
 }
 
 .chat-container {

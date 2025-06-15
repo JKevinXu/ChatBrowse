@@ -453,51 +453,53 @@ export class PopupUI {
   }
 
   private cycleWindowSize(): void {
-    // Define size presets: [width, height] - only keep second smallest and largest
-    const sizePresets = [
-      [450, 600],   // Default (second smallest)
-      [650, 800]    // Extra Large (largest)
-    ];
+    // Define size preset classes
+    const sizeClasses = ['size-default', 'size-large'];
     
-    const currentWidth = document.body.offsetWidth;
-    const currentHeight = document.body.offsetHeight;
+    // Get current size class
+    const currentClass = sizeClasses.find(cls => document.body.classList.contains(cls));
+    const currentIndex = currentClass ? sizeClasses.indexOf(currentClass) : 0;
     
-    // Find current preset or closest match
-    let currentPresetIndex = 0; // Default to first preset
-    for (let i = 0; i < sizePresets.length; i++) {
-      const [width, height] = sizePresets[i];
-      if (Math.abs(currentWidth - width) < 50 && Math.abs(currentHeight - height) < 50) {
-        currentPresetIndex = i;
-        break;
-      }
+    // Remove current size class
+    if (currentClass) {
+      document.body.classList.remove(currentClass);
     }
     
     // Cycle to next preset
-    const nextPresetIndex = (currentPresetIndex + 1) % sizePresets.length;
-    const [newWidth, newHeight] = sizePresets[nextPresetIndex];
+    const nextIndex = (currentIndex + 1) % sizeClasses.length;
+    const nextClass = sizeClasses[nextIndex];
     
-    // Apply new size
-    document.body.style.width = `${newWidth}px`;
-    document.body.style.height = `${newHeight}px`;
+    // Apply new size class
+    document.body.classList.add(nextClass);
     
-    // Save the size
-    this.saveWindowSize(newWidth, newHeight);
+    // Save the size class preference
+    this.saveSizeClass(nextClass);
   }
 
   private loadWindowSize(): void {
-    const savedSize = localStorage.getItem('chatbrowse-popup-size');
-    if (savedSize) {
-      try {
-        const { width, height } = JSON.parse(savedSize);
-        document.body.style.width = `${width}px`;
-        document.body.style.height = `${height}px`;
-      } catch (error) {
-        console.log('Failed to load saved popup size:', error);
-      }
+    const savedSizeClass = localStorage.getItem('chatbrowse-popup-size-class');
+    if (savedSizeClass && ['size-default', 'size-large'].includes(savedSizeClass)) {
+      // Remove any existing size classes
+      document.body.classList.remove('size-default', 'size-large');
+      // Apply saved size class
+      document.body.classList.add(savedSizeClass);
+    } else {
+      // Default to size-default if no saved preference
+      document.body.classList.add('size-default');
+    }
+  }
+
+  private saveSizeClass(sizeClass: string): void {
+    try {
+      localStorage.setItem('chatbrowse-popup-size-class', sizeClass);
+    } catch (error) {
+      console.log('Failed to save popup size class:', error);
     }
   }
 
   private saveWindowSize(width: number, height: number): void {
+    // This method is now deprecated in favor of saveSizeClass
+    // Keeping for backward compatibility but not used
     try {
       localStorage.setItem('chatbrowse-popup-size', JSON.stringify({ width, height }));
     } catch (error) {
