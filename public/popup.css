@@ -73,7 +73,8 @@ body.size-large {
 
 #settingsButton,
 #newConversationButton,
-#resizeButton {
+#resizeButton,
+#summarizeButton {
   background: none;
   border: none;
   color: white;
@@ -86,12 +87,29 @@ body.size-large {
 
 #settingsButton:hover,
 #newConversationButton:hover,
-#resizeButton:hover {
+#resizeButton:hover,
+#summarizeButton:hover {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
 #newConversationButton {
   font-size: 16px; /* Slightly smaller for the refresh icon */
+}
+
+#summarizeButton {
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+#summarizeButton:hover {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 #resizeButton {

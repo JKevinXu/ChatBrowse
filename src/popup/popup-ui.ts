@@ -9,18 +9,22 @@ export class PopupUI {
   private settingsButton: HTMLElement | null = null;
   private newConversationButton: HTMLElement | null = null;
   private resizeButton: HTMLElement | null = null;
+  private summarizeButton: HTMLElement | null = null;
   private onMessageSend?: (text: string) => void;
   private onSettingsClick?: () => void;
   private onNewConversation?: () => void;
+  private onSummarizePage?: () => void;
 
   constructor(
     onMessageSend?: (text: string) => void,
     onSettingsClick?: () => void,
-    onNewConversation?: () => void
+    onNewConversation?: () => void,
+    onSummarizePage?: () => void
   ) {
     this.onMessageSend = onMessageSend;
     this.onSettingsClick = onSettingsClick;
     this.onNewConversation = onNewConversation;
+    this.onSummarizePage = onSummarizePage;
     this.setupMarked();
     this.initialize();
   }
@@ -46,6 +50,7 @@ export class PopupUI {
     this.settingsButton = document.getElementById('settingsButton');
     this.newConversationButton = document.getElementById('newConversationButton');
     this.resizeButton = document.getElementById('resizeButton');
+    this.summarizeButton = document.getElementById('summarizeButton');
   }
 
   private setupEventListeners(): void {
@@ -66,6 +71,12 @@ export class PopupUI {
     this.newConversationButton?.addEventListener('click', () => {
       if (this.onNewConversation) {
         this.onNewConversation();
+      }
+    });
+
+    this.summarizeButton?.addEventListener('click', () => {
+      if (this.onSummarizePage) {
+        this.onSummarizePage();
       }
     });
 
@@ -450,6 +461,15 @@ export class PopupUI {
   setInputDisabled(disabled: boolean): void {
     if (!this.userInput) return;
     (this.userInput as HTMLInputElement).disabled = disabled;
+  }
+
+  setInputValue(value: string): void {
+    if (!this.userInput) return;
+    (this.userInput as HTMLInputElement).value = value;
+  }
+
+  triggerSendMessage(): void {
+    this.handleSendMessage();
   }
 
   private cycleWindowSize(): void {

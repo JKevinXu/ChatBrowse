@@ -18,7 +18,8 @@ class PopupApp {
     this.ui = new PopupUI(
       (text: string) => this.handleUserMessage(text),
       () => this.handleSettings(),
-      () => this.handleNewConversation()
+      () => this.handleNewConversation(),
+      () => this.handleSummarizePage()
     );
     
     // Connect the message handler to the UI for processing indicators
@@ -138,6 +139,14 @@ class PopupApp {
     console.log('📨 PopupApp: Handling incoming message:', message);
     this.ui.addMessageToChat(message);
     await this.sessionManager.addMessageToSession(message);
+  }
+
+  private async handleSummarizePage(): Promise<void> {
+    console.log('📄 PopupApp: Auto-filling summarize command...');
+    
+    // Auto-fill the input with the summarize command and send it
+    this.ui.setInputValue('Summarize the page');
+    this.ui.triggerSendMessage();
   }
 
   private async handleNewConversation(): Promise<void> {
