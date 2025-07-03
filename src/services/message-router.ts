@@ -175,16 +175,22 @@ export class MessageRouter {
         stack: (error as Error).stack,
         name: (error as Error).name
       });
-      console.log('❌ [MessageRouter] No fallback available - throwing error');
       
-      // Send error response instead of falling back
-      sendResponse({
-        type: 'ERROR',
-        payload: { 
-          message: `Intent classification failed: ${(error as Error).message}` 
-        }
-      });
-      return false;
+      // If intent classification fails, fall back to general chat instead of erroring
+      console.log('🔄 [MessageRouter] Intent classification failed - falling back to general chat');
+      try {
+        await this.llmService.handleChat(payload, sender, sendResponse);
+        return true;
+      } catch (fallbackError) {
+        console.error('❌ [MessageRouter] Even fallback failed:', fallbackError);
+        sendResponse({
+          type: 'ERROR',
+          payload: { 
+            message: `Sorry, I'm having trouble processing your request right now. Please try again.` 
+          }
+        });
+        return false;
+      }
     } finally {
       console.log('🎯 [MessageRouter] ===== FINISHED USER MESSAGE HANDLING =====');
     }

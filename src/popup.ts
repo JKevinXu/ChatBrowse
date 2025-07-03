@@ -2,6 +2,7 @@ import { createMessage } from './utils';
 import { PopupUI } from './popup/popup-ui';
 import { SessionManager } from './popup/session-manager';
 import { MessageHandler } from './popup/message-handler';
+import { loadFromStorage } from './utils';
 
 class PopupApp {
   private ui: PopupUI;
@@ -25,6 +26,13 @@ class PopupApp {
     // Connect the message handler to the UI for processing indicators
     this.messageHandler.setUI(this.ui);
     
+    // Listen for storage changes to detect when API key is configured
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'local' && changes.settings) {
+        this.handleSettingsChange(changes.settings.newValue);
+      }
+    });
+    
     console.log('🔧 PopupApp: Constructor completed');
     
     this.initialize();
@@ -34,6 +42,18 @@ class PopupApp {
     console.log('🚀 PopupApp: Initializing...');
     
     try {
+      // Check if API key or Bedrock credentials are configured before showing chat interface
+      const settings = await loadFromStorage<any>('settings');
+      const hasOpenAIKey = settings && (settings.openaiApiKey || (settings.llm && settings.llm.openai && settings.llm.openai.apiKey));
+      const hasBedrockCredentials = settings && settings.llm && settings.llm.bedrock && 
+        settings.llm.bedrock.accessKeyId && settings.llm.bedrock.secretAccessKey;
+      
+      if (!hasOpenAIKey && !hasBedrockCredentials) {
+        console.log('ChatBrowse: No API credentials configured, showing settings prompt');
+        this.showApiKeyPrompt();
+        return;
+      }
+      
       // Load or create session for the current tab
       const tabs = await this.sessionManager.getCurrentTab();
       if (tabs.length > 0) {
@@ -209,6 +229,54 @@ class PopupApp {
 
   private handleSettings(): void {
     chrome.runtime.openOptionsPage();
+  }
+
+  private showApiKeyPrompt(): void {
+    // Hide the chat interface and show API key configuration prompt
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+      chatContainer.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+          <h2>🔑 API Credentials Required</h2>
+          <p style="margin: 16px 0; color: #666;">
+            Please configure your AI provider credentials to use ChatBrowse.
+          </p>
+          <button id="openSettingsBtn" style="
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 14px;
+          ">
+            Open Settings
+          </button>
+          <p style="margin-top: 16px; font-size: 12px; color: #888;">
+            Configure <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #007cba;">OpenAI</a> or <a href="https://docs.aws.amazon.com/bedrock/" target="_blank" style="color: #007cba;">AWS Bedrock</a> credentials
+          </p>
+        </div>
+      `;
+      
+      // Add click handler for settings button
+      const settingsBtn = document.getElementById('openSettingsBtn');
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+          chrome.runtime.openOptionsPage();
+          window.close(); // Close popup after opening settings
+        });
+      }
+    }
+  }
+
+  private async handleSettingsChange(newSettings: any): Promise<void> {
+    const hasOpenAIKey = newSettings && (newSettings.openaiApiKey || (newSettings.llm && newSettings.llm.openai && newSettings.llm.openai.apiKey));
+    const hasBedrockCredentials = newSettings && newSettings.llm && newSettings.llm.bedrock && 
+      newSettings.llm.bedrock.accessKeyId && newSettings.llm.bedrock.secretAccessKey;
+    
+    // Reinitialize the popup interface when settings change
+    console.log('ChatBrowse: Settings changed, reinitializing popup interface');
+    await this.initialize();
   }
 }
 

@@ -68,7 +68,19 @@ export class IntentService {
     console.log('---PROMPT END---');
 
     console.log('🤖 [IntentService] Sending request to LLM...');
-    const response = await this.generateText(prompt, 300, provider);
+    
+    // Add timeout to intent classification to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Intent classification timed out after 20 seconds'));
+      }, 20000); // 20 second timeout for intent classification
+    });
+
+    const response = await Promise.race([
+      this.generateText(prompt, 300, provider),
+      timeoutPromise
+    ]);
+    
     console.log('📨 [IntentService] Raw LLM response:');
     console.log('---RESPONSE START---');
     console.log(response);

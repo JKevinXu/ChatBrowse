@@ -1,5 +1,5 @@
 import { ChatSession } from './types';
-import { createChatSession, extractPageInfo, processCommand, createMessage } from './utils';
+import { createChatSession, extractPageInfo, processCommand, createMessage, loadFromStorage } from './utils';
 import { ChatUI } from './content/chat-ui';
 import { PageAnalyzer } from './content/page-analyzer';
 import { ActionExecutor } from './content/action-executor';
@@ -15,12 +15,30 @@ class ContentScript {
     this.pageAnalyzer = new PageAnalyzer();
     this.actionExecutor = new ActionExecutor();
     this.chatUI = new ChatUI((message) => this.handleUserMessage(message));
+    
+    // Listen for storage changes to detect when API key is configured
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'local' && changes.settings) {
+        this.handleSettingsChange(changes.settings.newValue);
+      }
+    });
   }
 
   async initialize(): Promise<void> {
     console.log('ChatBrowse content script initializing...');
     
     try {
+      // Check if API key or Bedrock credentials are configured before showing chat interface
+      const settings = await loadFromStorage<any>('settings');
+      const hasOpenAIKey = settings && (settings.openaiApiKey || (settings.llm && settings.llm.openai && settings.llm.openai.apiKey));
+      const hasBedrockCredentials = settings && settings.llm && settings.llm.bedrock && 
+        settings.llm.bedrock.accessKeyId && settings.llm.bedrock.secretAccessKey;
+      
+      if (!hasOpenAIKey && !hasBedrockCredentials) {
+        console.log('ChatBrowse: No API credentials configured, chat interface will not be shown');
+        return;
+      }
+      
       // Extract page info and create session
       const pageInfo = await extractPageInfo();
       const { title, url } = pageInfo;
@@ -582,6 +600,29 @@ class ContentScript {
         success: false, 
         error: (error as Error).message 
       });
+    }
+  }
+
+  private async handleSettingsChange(newSettings: any): Promise<void> {
+    const hasOpenAIKey = newSettings && (newSettings.openaiApiKey || (newSettings.llm && newSettings.llm.openai && newSettings.llm.openai.apiKey));
+    const hasBedrockCredentials = newSettings && newSettings.llm && newSettings.llm.bedrock && 
+      newSettings.llm.bedrock.accessKeyId && newSettings.llm.bedrock.secretAccessKey;
+    const hasAnyCredentials = hasOpenAIKey || hasBedrockCredentials;
+    
+    // If API credentials were just configured and chat is not yet initialized
+    if (hasAnyCredentials && !this.currentSession) {
+      console.log('ChatBrowse: API credentials configured, initializing chat interface');
+      await this.initialize();
+    }
+    // If API credentials were removed and chat is initialized
+    else if (!hasAnyCredentials && this.currentSession) {
+      console.log('ChatBrowse: API credentials removed, hiding chat interface');
+      this.currentSession = null;
+      // Hide the chat interface by removing the container
+      const container = document.querySelector('.chatbrowse-container');
+      if (container) {
+        container.remove();
+      }
     }
   }
 }
