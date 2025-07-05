@@ -83,6 +83,10 @@ export class MessageRouter {
           console.log('🐛 DEBUG: Handling SUMMARIZE_XIAOHONGSHU_POSTS');
           return this.handleXiaohongshuSummarization(request.payload, sender, sendResponse);
         
+        case 'OPEN_POPUP_AND_SUMMARIZE':
+          console.log('🐛 DEBUG: Handling OPEN_POPUP_AND_SUMMARIZE');
+          return this.handleOpenPopupAndSummarize(request.payload, sender, sendResponse);
+        
         default:
           console.log('🐛 DEBUG: Unknown command type:', request.type);
           sendResponse({
@@ -843,5 +847,39 @@ export class MessageRouter {
     summary += `\n\n💡 **注意**: 这是手动总结。AI 总结功能暂时不可用。`;
     
     return summary;
+  }
+
+  private handleOpenPopupAndSummarize(
+    payload: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response: any) => void
+  ): boolean {
+    console.log('🔧 MessageRouter: Opening popup and setting auto-summarize flag');
+    
+    try {
+      // Set a flag in storage that the popup should auto-summarize when it opens
+      chrome.storage.local.set({ 
+        autoSummarize: true,
+        autoSummarizeUrl: payload.url,
+        autoSummarizeTitle: payload.title 
+      }, () => {
+        console.log('✅ MessageRouter: Auto-summarize flag set in storage');
+        
+        // Open the popup
+        chrome.action.openPopup().then(() => {
+          console.log('✅ MessageRouter: Popup opened successfully');
+          sendResponse({ success: true });
+        }).catch((error) => {
+          console.error('❌ MessageRouter: Error opening popup:', error);
+          sendResponse({ error: error.message });
+        });
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('❌ MessageRouter: Error in handleOpenPopupAndSummarize:', error);
+      sendResponse({ error: (error as Error).message });
+      return false;
+    }
   }
 } 

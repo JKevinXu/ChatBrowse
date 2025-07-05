@@ -366,7 +366,7 @@ class ContentScript {
   }
 
   private handleClearChat(sendResponse: (response: any) => void): void {
-    this.chatUI.clearChat();
+    // No longer needed since we're not using in-page chat interface
     sendResponse({ success: true });
   }
 
@@ -583,8 +583,7 @@ class ContentScript {
       // Create a new session
       this.currentSession = createChatSession(url, title);
       
-      // Clear the chat UI and reinitialize with new session
-      this.chatUI.clearChat();
+      // Update the chat UI with new session
       this.chatUI.updateSession(this.currentSession);
       
       console.log('✅ CONTENT: New conversation started successfully');

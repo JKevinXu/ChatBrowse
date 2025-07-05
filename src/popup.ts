@@ -67,6 +67,9 @@ class PopupApp {
         
         // Render existing messages
         this.renderMessages(session.messages);
+        
+        // Check if we should auto-summarize
+        await this.checkAutoSummarize();
       } else {
         console.error('❌ PopupApp: No active tab found');
       }
@@ -277,6 +280,26 @@ class PopupApp {
     // Reinitialize the popup interface when settings change
     console.log('ChatBrowse: Settings changed, reinitializing popup interface');
     await this.initialize();
+  }
+
+  private async checkAutoSummarize(): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get(['autoSummarize', 'autoSummarizeUrl', 'autoSummarizeTitle']);
+      
+      if (result.autoSummarize) {
+        console.log('🔧 PopupApp: Auto-summarize flag detected, triggering summarization');
+        
+        // Clear the auto-summarize flag
+        await chrome.storage.local.remove(['autoSummarize', 'autoSummarizeUrl', 'autoSummarizeTitle']);
+        
+        // Wait a bit for the popup to finish loading, then trigger summarization
+        setTimeout(() => {
+          this.handleSummarizePage();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('❌ PopupApp: Error checking auto-summarize flag:', error);
+    }
   }
 }
 
