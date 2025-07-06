@@ -34,8 +34,6 @@ class PopupApp {
     });
     
     console.log('🔧 PopupApp: Constructor completed');
-    
-    this.initialize();
   }
 
   async initialize(): Promise<void> {
