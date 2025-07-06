@@ -170,7 +170,7 @@ export class MessageRouter {
         return true;
       }
 
-      return await this.routeToIntentHandler(intentResult, payload, sender, sendResponse, tabId, text, sessionId);
+      return await this.routeToIntentHandler(intentResult, payload, sender, sendResponse, tabId, text, sessionId, payload.requestId);
 
     } catch (error) {
       console.error('❌ [MessageRouter] Intent classification failed with error:', error);
@@ -207,7 +207,8 @@ export class MessageRouter {
     sendResponse: (response: ChatResponse) => void,
     tabId: number | undefined,
     text: string,
-    sessionId: string
+    sessionId: string,
+    requestId?: string
   ): Promise<boolean> {
     switch (intentResult.intent) {
       case 'action_execution':
@@ -243,7 +244,7 @@ export class MessageRouter {
             engine: intentResult.parameters.engine
           };
           console.log('🔧 [MessageRouter] Search command from LLM:', JSON.stringify(searchCommand));
-          await this.searchService.handleSearch(searchCommand, tabId, sendResponse, sessionId);
+          await this.searchService.handleSearch(searchCommand, tabId, sendResponse, sessionId, requestId);
           console.log('🎉 [MessageRouter] LLM-based search completed successfully');
           return true;
         }
@@ -255,7 +256,7 @@ export class MessageRouter {
         
         if (searchResult) {
           console.log('✅ [MessageRouter] Legacy parsing successful, executing search');
-          await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId);
+          await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId, requestId);
           console.log('🎉 [MessageRouter] Legacy search completed successfully');
           return true;
         } else {

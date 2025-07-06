@@ -133,7 +133,8 @@ export class PopupUI {
       id: message.id,
       sender: message.sender,
       text: message.text.substring(0, 50) + (message.text.length > 50 ? '...' : ''),
-      timestamp: message.timestamp
+      timestamp: message.timestamp,
+      latency: message.latency
     });
     
     if (!this.chatMessages) {
@@ -156,6 +157,19 @@ export class PopupUI {
       messageElement.textContent = message.text;
     }
     
+    // Add latency indicator for system messages
+    if (message.sender === 'system' && message.latency !== undefined) {
+      const latencyIndicator = document.createElement('div');
+      latencyIndicator.className = 'message-latency';
+      
+      // Format latency nicely
+      const formattedLatency = this.formatLatency(message.latency);
+      latencyIndicator.textContent = `⏱️ ${formattedLatency}`;
+      latencyIndicator.title = `Response time: ${message.latency}ms`;
+      
+      messageElement.appendChild(latencyIndicator);
+    }
+    
     messageElement.dataset.id = message.id;
     
     this.chatMessages.appendChild(messageElement);
@@ -166,6 +180,18 @@ export class PopupUI {
     
     // Scroll to the bottom
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+  }
+
+  private formatLatency(latency: number): string {
+    if (latency < 1000) {
+      return `${latency}ms`;
+    } else if (latency < 60000) {
+      return `${(latency / 1000).toFixed(1)}s`;
+    } else {
+      const minutes = Math.floor(latency / 60000);
+      const seconds = Math.floor((latency % 60000) / 1000);
+      return `${minutes}m ${seconds}s`;
+    }
   }
 
   private setupPostReferenceHovers(messageElement: HTMLElement): void {

@@ -50,7 +50,8 @@ export class SearchService {
     searchCommand: SearchCommand,
     tabId: number | undefined,
     sendResponse: (response: ChatResponse) => void,
-    sessionId: string
+    sessionId: string,
+    requestId?: string
   ): Promise<void> {
     const { query, engine } = searchCommand;
     
@@ -79,7 +80,8 @@ export class SearchService {
         type: 'MESSAGE' as const,
         payload: {
           text: message,
-          sessionId
+          sessionId,
+          requestId
         }
       };
       
@@ -149,7 +151,7 @@ export class SearchService {
           const extractionTabId = result.tabId || tabId;
           console.log(`🔍 [SearchService] Starting extraction - Extraction tab: ${extractionTabId}, Original tab: ${originalChatTabId}`);
           
-          await this.handleGoogleSearchExtraction(query, extractionTabId, sendFollowUpMessage, sessionId, originalChatTabId);
+          await this.handleGoogleSearchExtraction(query, extractionTabId, sendFollowUpMessage, sessionId, originalChatTabId, requestId);
           return;
         } else {
           successMessage += `\n\n📱 Browse the results manually or ask me to help extract information.`;
@@ -237,7 +239,8 @@ export class SearchService {
     tabId: number | undefined,
     sendMessage: (response: string) => void,
     sessionId: string,
-    originalChatTabId?: number
+    originalChatTabId?: number,
+    requestId?: string
   ): Promise<void> {
     try {
       console.log('🔍 Starting Google search result extraction for:', query);
@@ -303,7 +306,7 @@ export class SearchService {
             console.log('🤖 Starting AI summary generation...');
             sendMessage(`🤖 Generating AI analysis of the search results...`);
             
-            await this.generateGoogleResultsSummary(actualResult, query, sendMessage, sessionId, originalChatTabId);
+            await this.generateGoogleResultsSummary(actualResult, query, sendMessage, sessionId, originalChatTabId, requestId);
           } catch (summaryError) {
             console.error('❌ Google summary error:', summaryError);
             sendMessage(`⚠️ Results extracted successfully, but AI summary failed: ${(summaryError as Error).message}`);
@@ -619,7 +622,8 @@ export class SearchService {
     query: string,
     sendMessage: (response: string) => void,
     sessionId: string,
-    originalChatTabId?: number
+    originalChatTabId?: number,
+    requestId?: string
   ): Promise<void> {
     try {
       console.log('🤖 generateGoogleResultsSummary: Starting AI summary generation');

@@ -300,6 +300,24 @@ body.size-large {
   text-decoration: underline;
 }
 
+/* Latency indicator styles */
+.message-latency {
+  font-size: 11px;
+  color: #888;
+  margin-top: 6px;
+  text-align: right;
+  opacity: 0.8;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.message.user .message-latency {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-latency:hover {
+  opacity: 1;
+}
+
 .message blockquote {
   border-left: 4px solid #dfe2e5;
   padding-left: 12px;

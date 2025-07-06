@@ -5,6 +5,7 @@ export class MessageHandler {
   private onMessageReceived?: (message: Message) => void;
   private activeRequestId: string | null = null;
   private ui?: any; // Reference to UI for showing loading states
+  private requestStartTimes: Map<string, number> = new Map(); // Track request start times
 
   constructor(onMessageReceived?: (message: Message) => void) {
     this.onMessageReceived = onMessageReceived;
@@ -36,6 +37,18 @@ export class MessageHandler {
       if (request.type === 'MESSAGE' && request.payload && request.payload.sessionId) {
         console.log('🐛 POPUP DEBUG: Received multi-part response:', request);
         
+        // Calculate latency if we have a start time
+        const responseTime = Date.now();
+        let latency: number | undefined;
+        
+        if (request.payload.requestId && this.requestStartTimes.has(request.payload.requestId)) {
+          const startTime = this.requestStartTimes.get(request.payload.requestId)!;
+          latency = responseTime - startTime;
+          // Clean up the stored start time
+          this.requestStartTimes.delete(request.payload.requestId);
+          console.log(`⏱️ POPUP DEBUG: Response latency: ${latency}ms`);
+        }
+        
         // Hide typing indicator for any incoming message
         if (this.ui) {
           this.ui.hideTypingIndicator();
@@ -66,6 +79,10 @@ export class MessageHandler {
         }
         
         const responseMessage = createMessage(request.payload.text, 'system');
+        // Add latency information to the message
+        if (latency !== undefined) {
+          responseMessage.latency = latency;
+        }
         
         if (this.onMessageReceived) {
           this.onMessageReceived(responseMessage);
@@ -86,6 +103,12 @@ export class MessageHandler {
         // Generate a unique request ID for tracking multiple responses
         this.activeRequestId = sessionId + '_' + Date.now();
         
+        // Store the start time for latency calculation
+        const startTime = Date.now();
+        if (this.activeRequestId) {
+          this.requestStartTimes.set(this.activeRequestId, startTime);
+        }
+        
         console.log('🐛 POPUP DEBUG: Sending message:', text, 'SessionId:', sessionId);
         
         chrome.runtime.sendMessage(
@@ -104,7 +127,19 @@ export class MessageHandler {
             console.log('🐛 POPUP DEBUG: Initial response received:', response);
             
             if (response && response.type === 'MESSAGE') {
+              // Calculate latency for immediate response
+              const responseTime = Date.now();
+              const latency = responseTime - startTime;
+              
               const systemMessage = createMessage(response.payload.text, 'system');
+              systemMessage.latency = latency;
+              
+              // Clean up the stored start time since we got an immediate response
+              if (this.activeRequestId) {
+                this.requestStartTimes.delete(this.activeRequestId);
+              }
+              
+              console.log(`⏱️ POPUP DEBUG: Immediate response latency: ${latency}ms`);
               resolve(systemMessage);
             } else {
               // For commands like Xiaohongshu summarization, the initial response might be null

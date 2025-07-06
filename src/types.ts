@@ -3,6 +3,8 @@ export interface Message {
   text: string;
   sender: 'user' | 'system';
   timestamp: number;
+  latency?: number; // Response time in milliseconds
+  startTime?: number; // When request was sent (for system messages)
 }
 
 export interface ChatSession {
