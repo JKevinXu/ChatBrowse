@@ -29,6 +29,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleBedrockSecretKey = document.getElementById('toggleBedrockSecretKey') as HTMLButtonElement | null;
   const testBedrockConnection = document.getElementById('testBedrockConnection') as HTMLButtonElement | null;
   
+  // Inception elements
+  const inceptionConfig = document.getElementById('inceptionConfig') as HTMLDivElement | null;
+  const inceptionApiKeyInput = document.getElementById('inceptionApiKey') as HTMLInputElement | null;
+  const inceptionModelSelect = document.getElementById('inceptionModel') as HTMLSelectElement | null;
+  const inceptionBaseUrlInput = document.getElementById('inceptionBaseUrl') as HTMLInputElement | null;
+  const toggleInceptionApiKey = document.getElementById('toggleInceptionApiKey') as HTMLButtonElement | null;
+  const testInceptionConnection = document.getElementById('testInceptionConnection') as HTMLButtonElement | null;
+  
   // Other elements
   const useCurrentBrowserCheckbox = document.getElementById('useCurrentBrowserCheckbox') as HTMLInputElement | null;
   const notificationCheckbox = document.getElementById('notificationCheckbox') as HTMLInputElement | null;
@@ -36,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const statusDiv = document.getElementById('status') as HTMLDivElement | null;
 
   // Check if elements exist
-  if (!llmProviderSelect || !openaiConfig || !bedrockConfig || !saveButton || !statusDiv) {
+  if (!llmProviderSelect || !openaiConfig || !bedrockConfig || !inceptionConfig || !saveButton || !statusDiv) {
     console.error('One or more required elements not found in the DOM');
     return;
   }
@@ -60,6 +68,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           bedrockAccessKeyInput.value = settings.llm.bedrock.accessKeyId || '';
           bedrockSecretKeyInput.value = settings.llm.bedrock.secretAccessKey || '';
           bedrockModelSelect.value = settings.llm.bedrock.model || 'claude-3-5-sonnet';
+        }
+        
+        if (settings.llm.inception && inceptionApiKeyInput && inceptionModelSelect && inceptionBaseUrlInput) {
+          inceptionApiKeyInput.value = settings.llm.inception.apiKey || '';
+          inceptionModelSelect.value = settings.llm.inception.model || 'mercury-coder';
+          inceptionBaseUrlInput.value = settings.llm.inception.baseUrl || 'https://api.inceptionlabs.ai/v1';
         }
       } else {
         // Migrate from old settings
@@ -93,6 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     openaiConfig.classList.toggle('active', selectedProvider === 'openai');
     bedrockConfig.classList.toggle('active', selectedProvider === 'bedrock');
+    inceptionConfig.classList.toggle('active', selectedProvider === 'inception');
   };
 
   // Initialize provider config visibility
@@ -119,6 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupToggleButton(toggleOpenaiApiKey, openaiApiKeyInput);
   setupToggleButton(toggleBedrockAccessKey, bedrockAccessKeyInput);
   setupToggleButton(toggleBedrockSecretKey, bedrockSecretKeyInput);
+  setupToggleButton(toggleInceptionApiKey, inceptionApiKeyInput);
 
   // Test connection buttons
   testOpenaiConnection?.addEventListener('click', async () => {
@@ -153,6 +169,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  testInceptionConnection?.addEventListener('click', async () => {
+    if (!inceptionApiKeyInput?.value.trim()) {
+      showMessage('Please enter your Inception API key first.', 'error');
+      return;
+    }
+    
+    showMessage('Testing Inception Labs connection...', 'success');
+    
+    try {
+      // We would need to implement a test endpoint in the background script
+      showMessage('Inception connection test not implemented yet.', 'error');
+    } catch (error) {
+      showMessage('Inception connection test failed: ' + (error as Error).message, 'error');
+    }
+  });
+
   // Save settings when the button is clicked
   saveButton.addEventListener('click', async () => {
     const selectedProvider = llmProviderSelect.value as LLMProvider;
@@ -174,6 +206,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         accessKeyId: bedrockAccessKeyInput.value.trim(),
         secretAccessKey: bedrockSecretKeyInput.value.trim(),
         model: bedrockModelSelect.value
+      };
+    }
+    
+    if (selectedProvider === 'inception' && inceptionApiKeyInput && inceptionModelSelect && inceptionBaseUrlInput) {
+      llmSettings.inception = {
+        apiKey: inceptionApiKeyInput.value.trim(),
+        model: inceptionModelSelect.value,
+        baseUrl: inceptionBaseUrlInput.value.trim() || 'https://api.inceptionlabs.ai/v1'
       };
     }
 

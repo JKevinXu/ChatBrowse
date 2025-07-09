@@ -166,6 +166,7 @@
                 <select id="llmProvider">
                     <option value="openai">OpenAI</option>
                     <option value="bedrock">AWS Bedrock</option>
+                    <option value="inception">Inception Labs</option>
                 </select>
                 <div class="help-text">Choose your preferred AI provider for chat responses.</div>
             </div>
@@ -232,6 +233,36 @@
                 </div>
                 <div class="help-text">
                     You need AWS credentials with Bedrock access. Ensure you have the necessary permissions and the models are enabled in your AWS account.
+                </div>
+            </div>
+            
+            <!-- Inception Configuration -->
+            <div id="inceptionConfig" class="provider-config">
+                <h3>Inception Labs Configuration</h3>
+                <div class="form-group">
+                    <label for="inceptionApiKey">API Key:</label>
+                    <div class="input-with-button">
+                        <input type="password" id="inceptionApiKey" placeholder="Enter your Inception Labs API key">
+                        <button type="button" class="toggle-btn" id="toggleInceptionApiKey">Show</button>
+                        <button type="button" class="test-btn" id="testInceptionConnection">Test</button>
+                    </div>
+                    <div class="help-text">Get your API key from <a href="https://inceptionlabs.ai" target="_blank">Inception Labs</a></div>
+                </div>
+                <div class="form-group">
+                    <label for="inceptionModel">Model:</label>
+                    <select id="inceptionModel">
+                        <option value="mercury-coder">Mercury Coder (Code Generation)</option>
+                        <option value="mercury-chat">Mercury Chat (Conversational)</option>
+                        <option value="mercury-base">Mercury Base</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="inceptionBaseUrl">Base URL:</label>
+                    <input type="text" id="inceptionBaseUrl" placeholder="https://api.inceptionlabs.ai/v1" value="https://api.inceptionlabs.ai/v1">
+                    <div class="help-text">API endpoint URL (leave default unless using a custom endpoint)</div>
+                </div>
+                <div class="help-text">
+                    Inception Labs provides advanced AI models optimized for coding and conversational tasks.
                 </div>
             </div>
         </div>

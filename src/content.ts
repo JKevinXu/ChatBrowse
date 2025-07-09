@@ -28,13 +28,15 @@ class ContentScript {
     console.log('ChatBrowse content script initializing...');
     
     try {
-      // Check if API key or Bedrock credentials are configured before showing chat interface
+      // Check if API key or credentials are configured before showing chat interface
       const settings = await loadFromStorage<any>('settings');
       const hasOpenAIKey = settings && (settings.openaiApiKey || (settings.llm && settings.llm.openai && settings.llm.openai.apiKey));
       const hasBedrockCredentials = settings && settings.llm && settings.llm.bedrock && 
         settings.llm.bedrock.accessKeyId && settings.llm.bedrock.secretAccessKey;
+      const hasInceptionKey = settings && settings.llm && settings.llm.inception && 
+        settings.llm.inception.apiKey && settings.llm.inception.apiKey.trim() !== '';
       
-      if (!hasOpenAIKey && !hasBedrockCredentials) {
+      if (!hasOpenAIKey && !hasBedrockCredentials && !hasInceptionKey) {
         console.log('ChatBrowse: No API credentials configured, chat interface will not be shown');
         return;
       }
@@ -606,7 +608,9 @@ class ContentScript {
     const hasOpenAIKey = newSettings && (newSettings.openaiApiKey || (newSettings.llm && newSettings.llm.openai && newSettings.llm.openai.apiKey));
     const hasBedrockCredentials = newSettings && newSettings.llm && newSettings.llm.bedrock && 
       newSettings.llm.bedrock.accessKeyId && newSettings.llm.bedrock.secretAccessKey;
-    const hasAnyCredentials = hasOpenAIKey || hasBedrockCredentials;
+    const hasInceptionKey = newSettings && newSettings.llm && newSettings.llm.inception && 
+      newSettings.llm.inception.apiKey && newSettings.llm.inception.apiKey.trim() !== '';
+    const hasAnyCredentials = hasOpenAIKey || hasBedrockCredentials || hasInceptionKey;
     
     // If API credentials were just configured and chat is not yet initialized
     if (hasAnyCredentials && !this.currentSession) {

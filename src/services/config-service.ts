@@ -1,5 +1,5 @@
 import { loadFromStorage, saveToStorage } from '../utils';
-import { LLMProvider, LLMSettings, OpenAIConfig, BedrockConfig } from '../types';
+import { LLMProvider, LLMSettings, OpenAIConfig, BedrockConfig, InceptionConfig } from '../types';
 
 export interface AppSettings {
   showNotifications: boolean;
@@ -109,6 +109,11 @@ export class ConfigService {
           accessKeyId: '',
           secretAccessKey: '',
           model: 'claude-4-sonnet'
+        },
+        inception: {
+          apiKey: '',
+          model: 'mercury-coder',
+          baseUrl: 'https://api.inceptionlabs.ai/v1'
         }
       }
     };
@@ -153,6 +158,17 @@ export class ConfigService {
     });
   }
 
+  async setInceptionConfig(config: InceptionConfig): Promise<void> {
+    const currentLLM = await this.getLLMSettings();
+    await this.updateSettings({
+      llm: {
+        ...currentLLM,
+        provider: 'inception',
+        inception: config
+      }
+    });
+  }
+
   // Convenience methods for common settings
   async getOpenAIApiKey(): Promise<string> {
     const llmSettings = await this.getLLMSettings();
@@ -165,6 +181,21 @@ export class ConfigService {
     if (currentLLM.openai) {
       await this.setOpenAIConfig({
         ...currentLLM.openai,
+        apiKey
+      });
+    }
+  }
+
+  async getInceptionApiKey(): Promise<string> {
+    const llmSettings = await this.getLLMSettings();
+    return llmSettings.inception?.apiKey || '';
+  }
+
+  async setInceptionApiKey(apiKey: string): Promise<void> {
+    const currentLLM = await this.getLLMSettings();
+    if (currentLLM.inception) {
+      await this.setInceptionConfig({
+        ...currentLLM.inception,
         apiKey
       });
     }

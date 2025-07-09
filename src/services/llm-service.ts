@@ -1,6 +1,7 @@
 import { ChatResponse, LLMProvider } from '../types';
 import { OpenAIService } from './openai-service';
 import { BedrockService } from './bedrock-service';
+import { InceptionService } from './inception-service';
 import { ContextService } from './context-service';
 import { ConfigService } from './config-service';
 
@@ -8,6 +9,7 @@ export class LLMService {
   private static instance: LLMService;
   private openaiService = new OpenAIService();
   private bedrockService = new BedrockService();
+  private inceptionService = new InceptionService();
   private contextService = new ContextService();
   private configService = ConfigService.getInstance();
 
@@ -47,10 +49,26 @@ export class LLMService {
       // Check if the selected provider is available
       const isAvailable = await this.isProviderAvailable(provider);
       if (!isAvailable) {
-        const providerName = provider === 'openai' ? 'OpenAI' : 'AWS Bedrock';
-        const credentialsMessage = provider === 'openai' 
-          ? 'Please set your OpenAI API key in the extension settings.'
-          : 'Please configure your AWS Bedrock credentials in the extension settings.';
+        let providerName = '';
+        let credentialsMessage = '';
+        
+        switch (provider) {
+          case 'openai':
+            providerName = 'OpenAI';
+            credentialsMessage = 'Please set your OpenAI API key in the extension settings.';
+            break;
+          case 'bedrock':
+            providerName = 'AWS Bedrock';
+            credentialsMessage = 'Please configure your AWS Bedrock credentials in the extension settings.';
+            break;
+          case 'inception':
+            providerName = 'Inception Labs';
+            credentialsMessage = 'Please set your Inception API key in the extension settings.';
+            break;
+          default:
+            providerName = 'LLM Provider';
+            credentialsMessage = 'Please configure your LLM provider settings.';
+        }
         
         sendResponse({
           type: 'MESSAGE',
@@ -148,7 +166,21 @@ export class LLMService {
 
       const isAvailable = await this.isProviderAvailable(provider);
       if (!isAvailable) {
-        const providerName = provider === 'openai' ? 'OpenAI' : 'AWS Bedrock';
+        let providerName = '';
+        switch (provider) {
+          case 'openai':
+            providerName = 'OpenAI';
+            break;
+          case 'bedrock':
+            providerName = 'AWS Bedrock';
+            break;
+          case 'inception':
+            providerName = 'Inception Labs';
+            break;
+          default:
+            providerName = 'LLM Provider';
+        }
+        
         sendResponse({
           type: 'MESSAGE',
           payload: {
@@ -201,6 +233,8 @@ export class LLMService {
         return await this.openaiService.initialize();
       case 'bedrock':
         return await this.bedrockService.isInitialized();
+      case 'inception':
+        return await this.inceptionService.isInitialized();
       default:
         return false;
     }
@@ -214,6 +248,9 @@ export class LLMService {
       case 'bedrock':
         const bedrockResponse = await this.bedrockService.generateText(prompt, maxTokens);
         return bedrockResponse.content;
+      case 'inception':
+        const inceptionResponse = await this.inceptionService.generateText(prompt, maxTokens);
+        return inceptionResponse.content;
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }

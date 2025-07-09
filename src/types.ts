@@ -33,7 +33,7 @@ export interface PageInfo {
   useAsContext?: boolean;
 }
 
-export type LLMProvider = 'openai' | 'bedrock';
+export type LLMProvider = 'openai' | 'bedrock' | 'inception';
 
 export interface OpenAIConfig {
   apiKey: string;
@@ -47,10 +47,17 @@ export interface BedrockConfig {
   model?: string;
 }
 
+export interface InceptionConfig {
+  apiKey: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 export interface LLMSettings {
   provider: LLMProvider;
   openai?: OpenAIConfig;
   bedrock?: BedrockConfig;
+  inception?: InceptionConfig;
 }
 
 export interface StorageData {

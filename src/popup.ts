@@ -40,13 +40,15 @@ class PopupApp {
     console.log('🚀 PopupApp: Initializing...');
     
     try {
-      // Check if API key or Bedrock credentials are configured before showing chat interface
+      // Check if API key or credentials are configured before showing chat interface
       const settings = await loadFromStorage<any>('settings');
       const hasOpenAIKey = settings && (settings.openaiApiKey || (settings.llm && settings.llm.openai && settings.llm.openai.apiKey));
       const hasBedrockCredentials = settings && settings.llm && settings.llm.bedrock && 
         settings.llm.bedrock.accessKeyId && settings.llm.bedrock.secretAccessKey;
+      const hasInceptionKey = settings && settings.llm && settings.llm.inception && 
+        settings.llm.inception.apiKey && settings.llm.inception.apiKey.trim() !== '';
       
-      if (!hasOpenAIKey && !hasBedrockCredentials) {
+      if (!hasOpenAIKey && !hasBedrockCredentials && !hasInceptionKey) {
         console.log('ChatBrowse: No API credentials configured, showing settings prompt');
         this.showApiKeyPrompt();
         return;
@@ -254,7 +256,7 @@ class PopupApp {
             Open Settings
           </button>
           <p style="margin-top: 16px; font-size: 12px; color: #888;">
-            Configure <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #007cba;">OpenAI</a> or <a href="https://docs.aws.amazon.com/bedrock/" target="_blank" style="color: #007cba;">AWS Bedrock</a> credentials
+            Configure <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #007cba;">OpenAI</a>, <a href="https://docs.aws.amazon.com/bedrock/" target="_blank" style="color: #007cba;">AWS Bedrock</a>, or <a href="https://inceptionlabs.ai" target="_blank" style="color: #007cba;">Inception Labs</a> credentials
           </p>
         </div>
       `;
@@ -274,6 +276,8 @@ class PopupApp {
     const hasOpenAIKey = newSettings && (newSettings.openaiApiKey || (newSettings.llm && newSettings.llm.openai && newSettings.llm.openai.apiKey));
     const hasBedrockCredentials = newSettings && newSettings.llm && newSettings.llm.bedrock && 
       newSettings.llm.bedrock.accessKeyId && newSettings.llm.bedrock.secretAccessKey;
+    const hasInceptionKey = newSettings && newSettings.llm && newSettings.llm.inception && 
+      newSettings.llm.inception.apiKey && newSettings.llm.inception.apiKey.trim() !== '';
     
     // Reinitialize the popup interface when settings change
     console.log('ChatBrowse: Settings changed, reinitializing popup interface');
