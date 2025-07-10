@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openaiApiKeyInput = document.getElementById('openaiApiKey') as HTMLInputElement | null;
   const openaiModelSelect = document.getElementById('openaiModel') as HTMLSelectElement | null;
   const toggleOpenaiApiKey = document.getElementById('toggleOpenaiApiKey') as HTMLButtonElement | null;
-  const testOpenaiConnection = document.getElementById('testOpenaiConnection') as HTMLButtonElement | null;
   
   // Bedrock elements
   const bedrockConfig = document.getElementById('bedrockConfig') as HTMLDivElement | null;
@@ -27,7 +26,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const bedrockModelSelect = document.getElementById('bedrockModel') as HTMLSelectElement | null;
   const toggleBedrockAccessKey = document.getElementById('toggleBedrockAccessKey') as HTMLButtonElement | null;
   const toggleBedrockSecretKey = document.getElementById('toggleBedrockSecretKey') as HTMLButtonElement | null;
-  const testBedrockConnection = document.getElementById('testBedrockConnection') as HTMLButtonElement | null;
   
   // Inception elements
   const inceptionConfig = document.getElementById('inceptionConfig') as HTMLDivElement | null;
@@ -35,7 +33,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inceptionModelSelect = document.getElementById('inceptionModel') as HTMLSelectElement | null;
   const inceptionBaseUrlInput = document.getElementById('inceptionBaseUrl') as HTMLInputElement | null;
   const toggleInceptionApiKey = document.getElementById('toggleInceptionApiKey') as HTMLButtonElement | null;
-  const testInceptionConnection = document.getElementById('testInceptionConnection') as HTMLButtonElement | null;
   
   // Other elements
   const useCurrentBrowserCheckbox = document.getElementById('useCurrentBrowserCheckbox') as HTMLInputElement | null;
@@ -136,54 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupToggleButton(toggleBedrockSecretKey, bedrockSecretKeyInput);
   setupToggleButton(toggleInceptionApiKey, inceptionApiKeyInput);
 
-  // Test connection buttons
-  testOpenaiConnection?.addEventListener('click', async () => {
-    if (!openaiApiKeyInput?.value.trim()) {
-      showMessage('Please enter your OpenAI API key first.', 'error');
-      return;
-    }
-    
-    showMessage('Testing OpenAI connection...', 'success');
-    
-    try {
-      // We would need to implement a test endpoint in the background script
-      showMessage('OpenAI connection test not implemented yet.', 'error');
-    } catch (error) {
-      showMessage('OpenAI connection test failed: ' + (error as Error).message, 'error');
-    }
-  });
 
-  testBedrockConnection?.addEventListener('click', async () => {
-    if (!bedrockAccessKeyInput?.value.trim() || !bedrockSecretKeyInput?.value.trim()) {
-      showMessage('Please enter your AWS credentials first.', 'error');
-      return;
-    }
-    
-    showMessage('Testing AWS Bedrock connection...', 'success');
-    
-    try {
-      // We would need to implement a test endpoint in the background script
-      showMessage('Bedrock connection test not implemented yet.', 'error');
-    } catch (error) {
-      showMessage('Bedrock connection test failed: ' + (error as Error).message, 'error');
-    }
-  });
-
-  testInceptionConnection?.addEventListener('click', async () => {
-    if (!inceptionApiKeyInput?.value.trim()) {
-      showMessage('Please enter your Inception API key first.', 'error');
-      return;
-    }
-    
-    showMessage('Testing Inception Labs connection...', 'success');
-    
-    try {
-      // We would need to implement a test endpoint in the background script
-      showMessage('Inception connection test not implemented yet.', 'error');
-    } catch (error) {
-      showMessage('Inception connection test failed: ' + (error as Error).message, 'error');
-    }
-  });
 
   // Save settings when the button is clicked
   saveButton.addEventListener('click', async () => {
