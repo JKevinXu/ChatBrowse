@@ -731,6 +731,11 @@ export class MessageRouter {
     
     // Patterns for search and summarize commands
     const summaryPatterns = [
+      // Tool dropdown format with colon
+      /^(?:xiaohongshu:\s*(.+))$/i,
+      // General xiaohongshu prefix format
+      /^(?:xiaohongshu\s+(.+))$/i,
+      // Specific command formats
       /^(?:summarize\s+xiaohongshu\s+(.+))$/i,
       /^(?:xiaohongshu\s+summarize\s+(.+))$/i,
       /^(?:xiaohongshu\s+(.+)\s+summary)$/i,
@@ -743,8 +748,11 @@ export class MessageRouter {
       const match = lowerText.match(pattern);
       console.log('🐛 DEBUG: Testing pattern:', pattern, 'Match:', match);
       if (match && match[1]) {
-        console.log('🐛 DEBUG: Pattern matched! Returning query:', match[1].trim());
-        return match[1].trim();
+        const query = match[1].trim();
+        console.log('🐛 DEBUG: Pattern matched! Returning query:', query);
+        // Filter out common extraction keywords to get pure search query
+        const cleanQuery = query.replace(/^(extract\s+posts\s*:?\s*|posts\s*:?\s*)/i, '').trim();
+        return cleanQuery || query;
       }
     }
     

@@ -233,6 +233,13 @@ body.size-large {
   font-size: 14px;
 }
 
+.tool-icon-image {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+}
+
 .tool-text {
   font-size: 12px;
   font-weight: 500;
@@ -297,6 +304,13 @@ body.size-large {
   font-size: 14px;
   width: 16px;
   text-align: center;
+}
+
+.tool-option-icon-image {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 2px;
 }
 
 .tool-option-text {

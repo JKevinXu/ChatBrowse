@@ -44,9 +44,11 @@ export const INTENT_DEFINITIONS: Record<string, IntentDefinition> = {
     description: 'User wants to summarize Xiaohongshu content',
     examples: [
       'summarize xiaohongshu posts about travel', 
-      'sum up xiaohongshu fashion posts'
+      'sum up xiaohongshu fashion posts',
+      'xiaohongshu: travel tips',
+      'xiaohongshu: fashion trends'
     ],
-    chineseExamples: ['总结小红书旅游帖子'],
+    chineseExamples: ['总结小红书旅游帖子', 'xiaohongshu: 澳大利亚旅游', 'xiaohongshu: 时尚穿搭'],
     parameters: ['query']
   },
   
@@ -54,8 +56,13 @@ export const INTENT_DEFINITIONS: Record<string, IntentDefinition> = {
     id: 'xiaohongshu_extract',
     name: 'Xiaohongshu Extract',
     description: 'User wants to extract Xiaohongshu posts',
-    examples: ['extract xiaohongshu posts', 'get posts from this page'],
-    chineseExamples: ['提取小红书帖子']
+    examples: [
+      'extract xiaohongshu posts', 
+      'get posts from this page',
+      'extract xiaohongshu posts: fashion',
+      'xiaohongshu extract posts'
+    ],
+    chineseExamples: ['提取小红书帖子', 'extract xiaohongshu posts: 旅游攻略']
   },
   
   action_planning: {

@@ -169,16 +169,24 @@ export class PopupUI {
   private updateToolButtonDisplay(): void {
     if (!this.toolDropdownButton) return;
     
-    const toolIcon = this.toolDropdownButton.querySelector('.tool-icon');
+    const toolIcon = this.toolDropdownButton.querySelector('.tool-icon') as HTMLElement;
+    const toolIconImage = this.toolDropdownButton.querySelector('.tool-icon-image') as HTMLImageElement;
     const toolText = this.toolDropdownButton.querySelector('.tool-text');
     
     if (this.selectedTool === 'xiaohongshu') {
-      if (toolIcon) toolIcon.textContent = '📱';
+      // Hide emoji, show custom image
+      if (toolIcon) toolIcon.style.display = 'none';
+      if (toolIconImage) toolIconImage.style.display = 'inline-block';
       if (toolText) toolText.textContent = 'XHS';
       this.toolDropdownButton.classList.add('active');
       this.toolDropdownButton.title = 'Using Xiaohongshu tool';
     } else {
-      if (toolIcon) toolIcon.textContent = '🧰';
+      // Show emoji, hide custom image
+      if (toolIcon) {
+        toolIcon.textContent = '🧰';
+        toolIcon.style.display = 'inline-block';
+      }
+      if (toolIconImage) toolIconImage.style.display = 'none';
       if (toolText) toolText.textContent = 'Tool';
       this.toolDropdownButton.classList.remove('active');
       this.toolDropdownButton.title = 'Select tool';
