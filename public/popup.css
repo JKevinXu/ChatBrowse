@@ -171,6 +171,7 @@ body.size-large {
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-color);
   gap: 10px;
+  align-items: center;
 }
 
 #userInput {
@@ -188,6 +189,122 @@ body.size-large {
   box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
 }
 
+/* Tool Dropdown Styles */
+.tool-dropdown-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tool-dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.tool-dropdown-button:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.tool-dropdown-button.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.tool-dropdown-button.active:hover {
+  background-color: #357ABD;
+}
+
+.tool-icon {
+  font-size: 14px;
+}
+
+.tool-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.tool-dropdown-button.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.tool-dropdown-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-bottom: 8px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.2s ease;
+  z-index: 1000;
+  min-width: 160px;
+}
+
+.tool-dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.tool-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #495057;
+  transition: background-color 0.2s ease;
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.tool-option:hover {
+  background-color: #f8f9fa;
+}
+
+.tool-option.selected {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.tool-option-icon {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+}
+
+.tool-option-text {
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Update existing send button to maintain layout */
 #sendButton {
   padding: 12px 20px;
   background-color: var(--primary-color);

@@ -10,6 +10,9 @@ export class PopupUI {
   private newConversationButton: HTMLElement | null = null;
   private resizeButton: HTMLElement | null = null;
   private summarizeButton: HTMLElement | null = null;
+  private toolDropdownButton: HTMLElement | null = null;
+  private toolDropdownMenu: HTMLElement | null = null;
+  private selectedTool: string = 'none';
   private onMessageSend?: (text: string) => void;
   private onSettingsClick?: () => void;
   private onNewConversation?: () => void;
@@ -41,6 +44,7 @@ export class PopupUI {
     this.setupDOMElements();
     this.setupEventListeners();
     this.loadWindowSize();
+    this.loadSelectedTool();
   }
 
   private setupDOMElements(): void {
@@ -51,6 +55,8 @@ export class PopupUI {
     this.newConversationButton = document.getElementById('newConversationButton');
     this.resizeButton = document.getElementById('resizeButton');
     this.summarizeButton = document.getElementById('summarizeButton');
+    this.toolDropdownButton = document.getElementById('toolDropdownButton');
+    this.toolDropdownMenu = document.getElementById('toolDropdownMenu');
   }
 
   private setupEventListeners(): void {
@@ -83,6 +89,145 @@ export class PopupUI {
     this.resizeButton?.addEventListener('click', () => {
       this.cycleWindowSize();
     });
+
+    // Tool dropdown event listeners
+    this.setupToolDropdownListeners();
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.toolDropdownButton && this.toolDropdownMenu) {
+        if (!this.toolDropdownButton.contains(e.target as Node) && 
+            !this.toolDropdownMenu.contains(e.target as Node)) {
+          this.closeToolDropdown();
+        }
+      }
+    });
+  }
+
+  private setupToolDropdownListeners(): void {
+    // Toggle dropdown menu
+    this.toolDropdownButton?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleToolDropdown();
+    });
+
+    // Handle tool selection
+    this.toolDropdownMenu?.addEventListener('click', (e) => {
+      const toolOption = (e.target as HTMLElement).closest('.tool-option');
+      if (toolOption) {
+        const toolType = toolOption.getAttribute('data-tool');
+        if (toolType) {
+          this.selectTool(toolType);
+          this.closeToolDropdown();
+        }
+      }
+    });
+  }
+
+  private toggleToolDropdown(): void {
+    if (!this.toolDropdownMenu || !this.toolDropdownButton) return;
+    
+    const isOpen = this.toolDropdownMenu.classList.contains('show');
+    if (isOpen) {
+      this.closeToolDropdown();
+    } else {
+      this.openToolDropdown();
+    }
+  }
+
+  private openToolDropdown(): void {
+    if (!this.toolDropdownMenu || !this.toolDropdownButton) return;
+    
+    this.toolDropdownMenu.classList.add('show');
+    this.toolDropdownButton.classList.add('open');
+  }
+
+  private closeToolDropdown(): void {
+    if (!this.toolDropdownMenu || !this.toolDropdownButton) return;
+    
+    this.toolDropdownMenu.classList.remove('show');
+    this.toolDropdownButton.classList.remove('open');
+  }
+
+  private selectTool(toolType: string): void {
+    console.log('🔧 PopupUI: Tool selected:', toolType);
+    this.selectedTool = toolType;
+    
+    // Update button appearance and text
+    this.updateToolButtonDisplay();
+    
+    // Update selected option in menu
+    this.updateToolMenuSelection();
+    
+    // Save selection to localStorage
+    this.saveSelectedTool();
+
+    // Update input placeholder based on selected tool
+    this.updateInputPlaceholder();
+  }
+
+  private updateToolButtonDisplay(): void {
+    if (!this.toolDropdownButton) return;
+    
+    const toolIcon = this.toolDropdownButton.querySelector('.tool-icon');
+    const toolText = this.toolDropdownButton.querySelector('.tool-text');
+    
+    if (this.selectedTool === 'xiaohongshu') {
+      if (toolIcon) toolIcon.textContent = '📱';
+      if (toolText) toolText.textContent = 'XHS';
+      this.toolDropdownButton.classList.add('active');
+      this.toolDropdownButton.title = 'Using Xiaohongshu tool';
+    } else {
+      if (toolIcon) toolIcon.textContent = '🧰';
+      if (toolText) toolText.textContent = 'Tool';
+      this.toolDropdownButton.classList.remove('active');
+      this.toolDropdownButton.title = 'Select tool';
+    }
+  }
+
+  private updateToolMenuSelection(): void {
+    if (!this.toolDropdownMenu) return;
+    
+    // Remove previous selection
+    const previousSelected = this.toolDropdownMenu.querySelector('.tool-option.selected');
+    if (previousSelected) {
+      previousSelected.classList.remove('selected');
+    }
+    
+    // Add selection to current tool
+    const currentOption = this.toolDropdownMenu.querySelector(`[data-tool="${this.selectedTool}"]`);
+    if (currentOption) {
+      currentOption.classList.add('selected');
+    }
+  }
+
+  private updateInputPlaceholder(): void {
+    if (!this.userInput) return;
+    
+    if (this.selectedTool === 'xiaohongshu') {
+      this.userInput.placeholder = 'Ask about Xiaohongshu content or search...';
+    } else {
+      this.userInput.placeholder = 'Type your question or command...';
+    }
+  }
+
+  private saveSelectedTool(): void {
+    try {
+      localStorage.setItem('chatbrowse-selected-tool', this.selectedTool);
+    } catch (error) {
+      console.log('Failed to save selected tool:', error);
+    }
+  }
+
+  private loadSelectedTool(): void {
+    try {
+      const savedTool = localStorage.getItem('chatbrowse-selected-tool');
+      if (savedTool && (savedTool === 'none' || savedTool === 'xiaohongshu')) {
+        this.selectTool(savedTool);
+      }
+    } catch (error) {
+      console.log('Failed to load selected tool:', error);
+    }
   }
 
   private handleSendMessage(): void {
@@ -93,6 +238,27 @@ export class PopupUI {
     if (!text) return;
     
     console.log('🔧 PopupUI: User input text:', text);
+    console.log('🔧 PopupUI: Selected tool:', this.selectedTool);
+    
+    // Modify the message based on selected tool
+    let finalMessage = text;
+    if (this.selectedTool === 'xiaohongshu') {
+      // Check if the message already contains xiaohongshu context
+      const hasXiaohongshuContext = /xiaohongshu|小红书|xhs/i.test(text);
+      
+      if (!hasXiaohongshuContext) {
+        // Add xiaohongshu context to the message
+        if (text.toLowerCase().includes('search')) {
+          finalMessage = `xiaohongshu ${text}`;
+        } else if (text.toLowerCase().includes('extract') || text.toLowerCase().includes('get posts')) {
+          finalMessage = `extract xiaohongshu posts: ${text}`;
+        } else {
+          finalMessage = `xiaohongshu: ${text}`;
+        }
+      }
+    }
+    
+    console.log('🔧 PopupUI: Final message:', finalMessage);
     
     // Clear input
     this.userInput.value = '';
@@ -101,7 +267,7 @@ export class PopupUI {
     // Notify parent (PopupApp will handle adding the message to chat)
     if (this.onMessageSend) {
       console.log('🔧 PopupUI: Calling onMessageSend callback');
-      this.onMessageSend(text);
+      this.onMessageSend(finalMessage);
     }
   }
 
