@@ -18,15 +18,15 @@ export interface XiaohongshuConfig {
 
 export const XIAOHONGSHU_CONFIG: XiaohongshuConfig = {
   // Rate limiting settings
-  rateLimitDelay: 5000, // 5 seconds between requests
+  rateLimitDelay: 2000, // 2 seconds between requests - optimized timing
   maxArticlesPerBatch: 5, // Maximum 5 articles per batch
   
   // Default extraction settings
   defaultMaxPosts: 5, // default number of posts to extract
-  defaultFetchFullContent: false, // whether to fetch full content by default
+  defaultFetchFullContent: true, // whether to fetch full content by default - optimized for auto-analysis
   
   // Page load timing
-  pageLoadWaitTime: 5000, // 5 seconds for page to load
+  pageLoadWaitTime: 2500, // 2.5 seconds for page to load - optimized timing
 };
 
 /**

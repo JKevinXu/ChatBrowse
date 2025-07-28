@@ -48,7 +48,7 @@ export class ExtractionService {
         // Use content script to extract posts with the proper extractor classes
         chrome.tabs.sendMessage(
           xiaohongshuTab.id!, 
-          { type: 'EXTRACT_POSTS_ASYNC', payload: { maxPosts: XIAOHONGSHU_CONFIG.defaultMaxPosts, fetchFullContent: true } }, // Use async method with rate limiting
+          { type: 'EXTRACT_POSTS_ASYNC', payload: { maxPosts: XIAOHONGSHU_CONFIG.defaultMaxPosts, fetchFullContent: XIAOHONGSHU_CONFIG.defaultFetchFullContent } }, // Use config-based settings
           async (result) => {
             console.log('🐛 DEBUG: Extract posts response:', result);
             
@@ -122,21 +122,17 @@ export class ExtractionService {
 
   private async findXiaohongshuTab(): Promise<chrome.tabs.Tab | null> {
     return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
+      // Optimized query: search for xiaohongshu tabs directly
+      chrome.tabs.query({ url: "*://www.xiaohongshu.com/*" }, (tabs) => {
         if (chrome.runtime.lastError) {
           console.error('Error querying tabs:', chrome.runtime.lastError);
           resolve(null);
           return;
         }
         
-        // Find the most recent Xiaohongshu tab
-        const xiaohongshuTabs = tabs.filter(tab => 
-          tab.url && tab.url.includes('xiaohongshu.com')
-        );
-        
-        if (xiaohongshuTabs.length > 0) {
+        if (tabs.length > 0) {
           // Return the most recently accessed tab
-          const mostRecent = xiaohongshuTabs.sort((a, b) => 
+          const mostRecent = tabs.sort((a, b) => 
             (b.lastAccessed || 0) - (a.lastAccessed || 0)
           )[0];
           resolve(mostRecent);
@@ -279,7 +275,7 @@ export class ExtractionService {
                   resolve(content);
                 }
               });
-            }, 2000); // Wait 2 seconds for content to load
+            }, 1000); // Wait 1 second for content to load - optimized timing
           }
         };
         

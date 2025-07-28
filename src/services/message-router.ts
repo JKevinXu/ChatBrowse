@@ -601,7 +601,7 @@ export class MessageRouter {
         sendFollowUpToPopup({
           type: 'MESSAGE',
           payload: {
-            text: `Searched Xiaohongshu for "${payload.query}" and navigated to results page`,
+            text: `✅ Opened Xiaohongshu search for "${payload.query}". Starting analysis in ${XIAOHONGSHU_CONFIG.pageLoadWaitTime / 1000}s...`,
             sessionId: payload.sessionId || 'default'
           }
         });
