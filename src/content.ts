@@ -4,6 +4,7 @@ import { ChatUI } from './content/chat-ui';
 import { PageAnalyzer } from './content/page-analyzer';
 import { ActionExecutor } from './content/action-executor';
 import { ExtractorFactory } from './extractors';
+import { XIAOHONGSHU_CONFIG } from './config';
 
 class ContentScript {
   private chatUI: ChatUI;
@@ -340,7 +341,7 @@ class ContentScript {
       console.log(`🔍 CONTENT: Using ${extractor.platform} extractor`);
       
       // Extract posts
-      const maxPosts = payload?.maxPosts || 5;
+      const maxPosts = payload?.maxPosts || XIAOHONGSHU_CONFIG.defaultMaxPosts;
       const fetchFullContent = payload?.fetchFullContent || false;
       console.log('🔍 CONTENT: Extraction options - maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
       
@@ -547,7 +548,7 @@ class ContentScript {
       }
       
       // Extract posts with rate limiting
-      const maxPosts = payload?.maxPosts || 2;
+      const maxPosts = payload?.maxPosts || XIAOHONGSHU_CONFIG.defaultMaxPosts;
       const fetchFullContent = payload?.fetchFullContent || false;
       console.log('🔍 CONTENT: Async extraction options - maxPosts:', maxPosts, 'fetchFullContent:', fetchFullContent);
       

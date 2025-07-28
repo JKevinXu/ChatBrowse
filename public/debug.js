@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         chrome.tabs.sendMessage(tab.id, { 
           type: 'EXTRACT_POSTS_ASYNC',
-          payload: { maxPosts: 2, fetchFullContent: false }
+          payload: { maxPosts: 5, fetchFullContent: false } // Note: This is hardcoded for debug purposes
         }, (response) => {
           if (chrome.runtime.lastError) {
             log(`Error: ${chrome.runtime.lastError.message}`, 'error');

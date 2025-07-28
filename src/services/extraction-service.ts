@@ -1,4 +1,5 @@
 import { ChatResponse } from '../types';
+import { XIAOHONGSHU_CONFIG } from '../config';
 
 export class ExtractionService {
   async extractXiaohongshuPosts(
@@ -15,7 +16,7 @@ export class ExtractionService {
         sendResponse({
           type: 'MESSAGE',
           payload: {
-            text: `🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...`,
+            text: `🚦 Extracting top ${XIAOHONGSHU_CONFIG.defaultMaxPosts} posts with rate limiting (${XIAOHONGSHU_CONFIG.rateLimitDelay / 1000}-second delays) from Xiaohongshu page...`,
             sessionId
           }
         });
@@ -47,7 +48,7 @@ export class ExtractionService {
         // Use content script to extract posts with the proper extractor classes
         chrome.tabs.sendMessage(
           xiaohongshuTab.id!, 
-          { type: 'EXTRACT_POSTS_ASYNC', payload: { maxPosts: 2, fetchFullContent: true } }, // Use async method with rate limiting
+          { type: 'EXTRACT_POSTS_ASYNC', payload: { maxPosts: XIAOHONGSHU_CONFIG.defaultMaxPosts, fetchFullContent: true } }, // Use async method with rate limiting
           async (result) => {
             console.log('🐛 DEBUG: Extract posts response:', result);
             

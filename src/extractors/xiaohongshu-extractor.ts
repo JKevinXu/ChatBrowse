@@ -1,11 +1,12 @@
 import { BaseExtractor, ExtractionResult, ExtractedPost } from './base-extractor';
+import { XIAOHONGSHU_CONFIG } from '../config';
 
 export class XiaohongshuExtractor extends BaseExtractor {
   platform = 'xiaohongshu';
   
   // Rate limiting properties
-  private static readonly RATE_LIMIT_DELAY = 7000; // 7 seconds between requests
-  private static readonly MAX_ARTICLES_PER_BATCH = 2; // Maximum 2 articles per batch
+  private static readonly RATE_LIMIT_DELAY = XIAOHONGSHU_CONFIG.rateLimitDelay;
+  private static readonly MAX_ARTICLES_PER_BATCH = XIAOHONGSHU_CONFIG.maxArticlesPerBatch;
   private static lastRequestTime = 0;
   private static requestCount = 0;
 

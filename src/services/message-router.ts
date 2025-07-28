@@ -6,7 +6,7 @@ import { ActionService } from './action-service';
 import { ContextService } from './context-service';
 import { ExtractionService } from './extraction-service';
 import { IntentService, IntentResult } from './intent-service';
-import { IntentType, IntentConfig } from '../config/intent-config';
+import { IntentType, IntentConfig, XIAOHONGSHU_CONFIG } from '../config';
 
 // Add Chrome types with proper interface
 declare global {
@@ -426,8 +426,8 @@ export class MessageRouter {
       chrome.tabs.sendMessage(tabId, { 
         type: 'EXTRACT_POSTS_ASYNC', 
         payload: { 
-          maxPosts: 2, // Rate-limited to 2 posts
-          fetchFullContent: payload?.fetchFullContent || false 
+          maxPosts: XIAOHONGSHU_CONFIG.defaultMaxPosts, // Rate-limited posts
+          fetchFullContent: payload?.fetchFullContent || XIAOHONGSHU_CONFIG.defaultFetchFullContent 
         } 
       }, (result) => {
         if (chrome.runtime.lastError) {
@@ -622,12 +622,12 @@ export class MessageRouter {
 
       // Step 2: Wait longer for page to load, then extract
       setTimeout(async () => {
-        console.log('🐛 DEBUG: Starting analysis after 7 seconds');
+        console.log(`🐛 DEBUG: Starting analysis after ${XIAOHONGSHU_CONFIG.pageLoadWaitTime / 1000} seconds`);
         try {
           sendFollowUpToPopup({
             type: 'MESSAGE',
             payload: {
-              text: '🚦 Extracting top 2 posts with rate limiting (7-second delays) from Xiaohongshu page...',
+              text: `🚦 Extracting top ${XIAOHONGSHU_CONFIG.defaultMaxPosts} posts with rate limiting (${XIAOHONGSHU_CONFIG.rateLimitDelay / 1000}-second delays) from Xiaohongshu page...`,
               sessionId: payload.sessionId || 'default'
             }
           });
@@ -731,7 +731,7 @@ export class MessageRouter {
             }
           });
         }
-      }, 7000); // Wait 7 seconds for page to load
+      }, XIAOHONGSHU_CONFIG.pageLoadWaitTime); // Wait for page to load
 
       console.log('🐛 DEBUG: Timeout set, method ending normally');
 
