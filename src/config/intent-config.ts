@@ -41,14 +41,31 @@ export const INTENT_DEFINITIONS: Record<string, IntentDefinition> = {
   xiaohongshu_summary: {
     id: 'xiaohongshu_summary',
     name: 'Xiaohongshu Summary',
-    description: 'User wants to summarize Xiaohongshu content',
+    description: 'User wants to analyze, summarize, or get information from Xiaohongshu content - includes ANY xiaohongshu query',
     examples: [
       'summarize xiaohongshu posts about travel', 
       'sum up xiaohongshu fashion posts',
       'xiaohongshu: travel tips',
-      'xiaohongshu: fashion trends'
+      'xiaohongshu: fashion trends',
+      'xiaohongshu travel',
+      'xiaohongshu 澳大利亚',
+      'find xiaohongshu posts about cooking',
+      'show me xiaohongshu content on beauty',
+      'xiaohongshu makeup tutorials',
+      'analyze xiaohongshu travel posts'
     ],
-    chineseExamples: ['总结小红书旅游帖子', 'xiaohongshu: 澳大利亚旅游', 'xiaohongshu: 时尚穿搭'],
+    chineseExamples: [
+      '总结小红书旅游帖子', 
+      'xiaohongshu: 澳大利亚旅游', 
+      'xiaohongshu: 时尚穿搭',
+      '小红书旅游',
+      '小红书美食',
+      '小红书澳大利亚旅游',
+      '小红书时尚',
+      '查看小红书内容',
+      '小红书搜索美妆',
+      '分析小红书帖子'
+    ],
     parameters: ['query']
   },
   
@@ -142,7 +159,8 @@ export class IntentConfig {
     return `IMPORTANT DISTINCTIONS:
 - "action_planning" is ONLY for specific UI interactions (clicking, selecting, downloading, form filling)
 - "general_chat" includes content analysis, page summarization, explanations, and general questions
-- "xiaohongshu_summary" is specifically for analyzing Xiaohongshu platform content
+- "xiaohongshu_summary" is for ANY xiaohongshu-related query (analysis, search, content requests) - automatically triggers search + extraction + analysis
+- "search" is for non-xiaohongshu search engines (google, bilibili, etc.)
 - General page summarization requests like "summarize the page" should be "general_chat"`;
   }
 } 

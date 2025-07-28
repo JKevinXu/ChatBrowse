@@ -244,6 +244,19 @@ export class MessageRouter {
             engine: intentResult.parameters.engine
           };
           console.log('🔧 [MessageRouter] Search command from LLM:', JSON.stringify(searchCommand));
+          
+          // 🚀 AUTO-ANALYSIS: If this is a xiaohongshu search, automatically trigger analysis
+          if (searchCommand.engine === 'xiaohongshu') {
+            console.log('📱 [MessageRouter] Xiaohongshu search detected - auto-triggering analysis');
+            await this.handleXiaohongshuSummarization({ 
+              query: searchCommand.query, 
+              tabId, 
+              sessionId 
+            }, sender, sendResponse);
+            console.log('🎉 [MessageRouter] Auto xiaohongshu analysis completed successfully');
+            return true;
+          }
+          
           await this.searchService.handleSearch(searchCommand, tabId, sendResponse, sessionId, requestId);
           console.log('🎉 [MessageRouter] LLM-based search completed successfully');
           return true;
@@ -256,6 +269,19 @@ export class MessageRouter {
         
         if (searchResult) {
           console.log('✅ [MessageRouter] Legacy parsing successful, executing search');
+          
+          // 🚀 AUTO-ANALYSIS: If this is a xiaohongshu search, automatically trigger analysis
+          if (searchResult.engine === 'xiaohongshu') {
+            console.log('📱 [MessageRouter] Xiaohongshu search detected (legacy) - auto-triggering analysis');
+            await this.handleXiaohongshuSummarization({ 
+              query: searchResult.query, 
+              tabId, 
+              sessionId 
+            }, sender, sendResponse);
+            console.log('🎉 [MessageRouter] Auto xiaohongshu analysis (legacy) completed successfully');
+            return true;
+          }
+          
           await this.searchService.handleSearch(searchResult, tabId, sendResponse, sessionId, requestId);
           console.log('🎉 [MessageRouter] Legacy search completed successfully');
           return true;
