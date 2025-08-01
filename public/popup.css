@@ -676,16 +676,19 @@ body.size-large {
   background: #4a90e2;
   color: white;
   border: none;
-  padding: 3px 6px;
-  border-radius: 3px;
+  padding: 4px 8px;
+  border-radius: 4px;
   font-size: 10px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .popup-post-tooltip .view-full-post-btn:hover {
   background: #357ABD;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(74, 144, 226, 0.3);
 }
 
 /* Legacy image and content styling for fallback */
@@ -780,12 +783,16 @@ body.size-large {
   text-decoration: none !important;
   border-bottom: 1px dotted #0366d6 !important;
   transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  font-weight: 500 !important;
 }
 
 .message a.post-reference:hover {
   color: #0553c1 !important;
   border-bottom-style: solid !important;
   background-color: rgba(3, 102, 214, 0.1) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 4px rgba(3, 102, 214, 0.2) !important;
 }
 
 @keyframes tooltipFadeIn {

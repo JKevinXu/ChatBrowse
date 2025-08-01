@@ -26,7 +26,7 @@ export const XIAOHONGSHU_CONFIG: XiaohongshuConfig = {
   defaultFetchFullContent: true, // whether to fetch full content by default - optimized for auto-analysis
   
   // Page load timing
-  pageLoadWaitTime: 2500, // 2.5 seconds for page to load - optimized timing
+  pageLoadWaitTime: 5000, // 5 seconds for page to load - increased for better reliability
 };
 
 /**

@@ -374,6 +374,16 @@ export class PopupUI {
     postLinks.forEach(link => {
       const linkElement = link as HTMLElement;
       
+      // Add click handler to open links in new tab
+      linkElement.addEventListener('click', (e) => {
+        e.preventDefault(); // Prevent default navigation
+        const href = (linkElement as HTMLAnchorElement).href;
+        if (href) {
+          // Open in new tab
+          chrome.tabs.create({ url: href });
+        }
+      });
+      
       linkElement.addEventListener('mouseenter', (e) => {
         // Cancel any existing hide timeouts
         if ((window as any).popupHideTimeout) {
@@ -446,7 +456,7 @@ export class PopupUI {
         <div class="iframe-fallback" style="display: none;">
           <div class="fallback-header">
             <span class="fallback-notice">Preview unavailable - site blocks embedding</span>
-            <button class="view-full-post-btn" onclick="window.open('${postUrl}', '_blank'); event.stopPropagation();">
+            <button class="view-full-post-btn" data-post-url="${postUrl}">
               📖 View Full Post
             </button>
           </div>
@@ -475,6 +485,18 @@ export class PopupUI {
     
     // Add to popup body
     document.body.appendChild(tooltip);
+    
+    // Add click handler for the "View Full Post" button
+    const viewFullPostBtn = tooltip.querySelector('.view-full-post-btn') as HTMLButtonElement;
+    if (viewFullPostBtn) {
+      viewFullPostBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = viewFullPostBtn.dataset.postUrl;
+        if (url) {
+          chrome.tabs.create({ url: url });
+        }
+      });
+    }
     
     // Improved hover handling for tooltip
     tooltip.addEventListener('mouseenter', () => {
