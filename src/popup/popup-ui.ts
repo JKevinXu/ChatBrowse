@@ -164,6 +164,24 @@ export class PopupUI {
 
     // Update input placeholder based on selected tool
     this.updateInputPlaceholder();
+
+    // Auto-list tools when MCP is selected (one-click behavior)
+    if (toolType === 'mcp') {
+      this.autoListMCPTools();
+    }
+  }
+
+  /**
+   * Automatically list MCP tools when MCP tool is selected
+   */
+  private autoListMCPTools(): void {
+    console.log('🔌 PopupUI: Auto-listing MCP tools...');
+    
+    // Set input value and trigger send (one-click behavior)
+    if (this.userInput) {
+      this.userInput.value = 'list tools';
+      this.handleSendMessage();
+    }
   }
 
   private updateToolButtonDisplay(): void {
@@ -180,6 +198,16 @@ export class PopupUI {
       if (toolText) toolText.textContent = 'XHS';
       this.toolDropdownButton.classList.add('active');
       this.toolDropdownButton.title = 'Using Xiaohongshu tool';
+    } else if (this.selectedTool === 'mcp') {
+      // Show MCP icon
+      if (toolIcon) {
+        toolIcon.textContent = '🔌';
+        toolIcon.style.display = 'inline-block';
+      }
+      if (toolIconImage) toolIconImage.style.display = 'none';
+      if (toolText) toolText.textContent = 'MCP';
+      this.toolDropdownButton.classList.add('active');
+      this.toolDropdownButton.title = 'Using MCP Client';
     } else {
       // Show emoji, hide custom image
       if (toolIcon) {
@@ -214,6 +242,8 @@ export class PopupUI {
     
     if (this.selectedTool === 'xiaohongshu') {
       this.userInput.placeholder = 'Ask about Xiaohongshu content or search...';
+    } else if (this.selectedTool === 'mcp') {
+      this.userInput.placeholder = 'Send command to MCP server...';
     } else {
       this.userInput.placeholder = 'Type your question or command...';
     }
@@ -230,7 +260,7 @@ export class PopupUI {
   private loadSelectedTool(): void {
     try {
       const savedTool = localStorage.getItem('chatbrowse-selected-tool');
-      if (savedTool && (savedTool === 'none' || savedTool === 'xiaohongshu')) {
+      if (savedTool && (savedTool === 'none' || savedTool === 'xiaohongshu' || savedTool === 'mcp')) {
         this.selectTool(savedTool);
       }
     } catch (error) {
@@ -263,6 +293,13 @@ export class PopupUI {
         } else {
           finalMessage = `xiaohongshu: ${text}`;
         }
+      }
+    } else if (this.selectedTool === 'mcp') {
+      // Add MCP context to the message (placeholder for future implementation)
+      const hasMcpContext = /mcp:|mcp\s/i.test(text);
+      
+      if (!hasMcpContext) {
+        finalMessage = `mcp: ${text}`;
       }
     }
     

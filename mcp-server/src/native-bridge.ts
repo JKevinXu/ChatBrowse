@@ -24,18 +24,60 @@ console.error(`NATIVE_BRIDGE_LOG: mcpServerPath is ${mcpServerPath}`); // Log 4
 
 const NODE_EXEC_PATH = "/opt/homebrew/bin/node"; // Hardcoded path to node
 
-let mcpServerInstance: ChildProcess | null = null; // Renamed for clarity, initialized to null
+// MCP Server instances
+let mcpServerInstance: ChildProcess | null = null; // ChatBrowse MCP server
+let gameAutomationServer: ChildProcess | null = null; // Game automation MCP server
+
+// Game automation server configuration
+const GAME_AUTOMATION_SERVER = {
+  command: "/Users/kx/game_automation_project/venv/bin/python3",
+  args: ["/Users/kx/game_automation_project/mcp_game_automation_server/server.py"]
+};
 
 try {
   console.error('NATIVE_BRIDGE_LOG: Attempting to spawn MCP server process...'); // Log 5
+  
+  // Spawn ChatBrowse MCP server
   mcpServerInstance = spawn(NODE_EXEC_PATH, [mcpServerPath], {
     stdio: ['pipe', 'pipe', 'pipe']
   });
-  console.error('NATIVE_BRIDGE_LOG: Spawn call completed.'); // Log 6
+  console.error('NATIVE_BRIDGE_LOG: ChatBrowse MCP server spawn call completed.'); // Log 6
 
-  // Explicitly check if mcpServerInstance was created successfully
+  // Spawn Game Automation MCP server
+  gameAutomationServer = spawn(GAME_AUTOMATION_SERVER.command, GAME_AUTOMATION_SERVER.args, {
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  console.error('NATIVE_BRIDGE_LOG: Game Automation MCP server spawn call completed.');
+  
+  // Initialize the game automation server immediately after spawning
+  setTimeout(() => {
+    if (gameAutomationServer && gameAutomationServer.stdin && !gameAutomationServer.stdin.destroyed) {
+      const initRequest = JSON.stringify({
+        jsonrpc: "2.0",
+        id: Date.now(),
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: {
+            name: "ChatBrowse MCP Client",
+            version: "1.0.0"
+          }
+        }
+      }) + '\n';
+      
+      console.error('NATIVE_BRIDGE_LOG: Auto-initializing game automation server on startup:', initRequest.trim());
+      gameAutomationServer.stdin.write(initRequest);
+    }
+  }, 1000); // Give server time to start
+
+  // Explicitly check if both servers were created successfully
   if (!mcpServerInstance) {
-    throw new Error('Failed to spawn MCP server process, spawn returned null/undefined.');
+    throw new Error('Failed to spawn ChatBrowse MCP server process, spawn returned null/undefined.');
+  }
+  
+  if (!gameAutomationServer) {
+    throw new Error('Failed to spawn Game Automation MCP server process, spawn returned null/undefined.');
   }
 
   // These handlers are only attached if mcpServerInstance was successfully created by spawn.
@@ -77,11 +119,103 @@ try {
     throw new Error('NATIVE_BRIDGE_LOG: MCP server stderr is not available.');
   }
 
+  // Game Automation Server handlers
+  gameAutomationServer.on('error', (err) => {
+    const spawnErrorMsg = `NATIVE_BRIDGE_LOG: Game Automation process error: ${err.message}`;
+    console.error(spawnErrorMsg);
+    if (typeof sendMessageToChrome === 'function') {
+      sendMessageToChrome({ success: false, error: spawnErrorMsg });
+    }
+  });
+
+  gameAutomationServer.on('exit', (code, signal) => {
+    const exitMsg = `NATIVE_BRIDGE_LOG: Game Automation process exited with code ${code}, signal ${signal}`;
+    console.error(exitMsg);
+  });
+
+  if (gameAutomationServer.stdout) {
+    gameAutomationServer.stdout.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      console.error(`NATIVE_BRIDGE_LOG: Game Automation stdout: ${output}`);
+      
+      // Handle multiple JSON responses that might be on separate lines
+      const lines = output.split('\n').filter(line => line.trim());
+      
+      for (const line of lines) {
+        try {
+          const response = JSON.parse(line);
+          console.error('NATIVE_BRIDGE_LOG: Parsed response:', JSON.stringify(response));
+          
+          // Check if this is an initialize response
+          if (response.result && response.result.protocolVersion) {
+            console.error('NATIVE_BRIDGE_LOG: Received initialize response:', JSON.stringify(response.result));
+            
+            // Send initialized notification
+            const initializedNotification = JSON.stringify({
+              jsonrpc: "2.0",
+              method: "notifications/initialized"
+            }) + '\n';
+            
+            if (gameAutomationServer && gameAutomationServer.stdin && !gameAutomationServer.stdin.destroyed) {
+              gameAutomationServer.stdin.write(initializedNotification);
+              console.error('NATIVE_BRIDGE_LOG: Sent initialized notification');
+              
+              // Mark as initialized only after sending the notification
+              setTimeout(() => {
+                (gameAutomationServer as any)._initialized = true;
+                (gameAutomationServer as any)._initializing = false;
+                console.error('NATIVE_BRIDGE_LOG: Server fully initialized and ready for tools/list');
+                
+                // Process any pending requests after initialization
+                const pendingRequests = (gameAutomationServer as any)._pendingRequests || [];
+                (gameAutomationServer as any)._pendingRequests = [];
+                
+                pendingRequests.forEach((request: any) => {
+                  console.error('NATIVE_BRIDGE_LOG: Processing pending request after initialization:', request);
+                  handleMessage(request);
+                });
+              }, 500); // Give time for initialized notification to be processed
+            }
+          }
+          
+                      // Log all responses for debugging
+            if (response.error) {
+              console.error('NATIVE_BRIDGE_LOG: Received error response:', JSON.stringify(response));
+              console.error('NATIVE_BRIDGE_LOG: Error details - code:', response.error.code, 'message:', response.error.message);
+            } else if (response.result) {
+              console.error('NATIVE_BRIDGE_LOG: Received success response with result');
+              if (response.result.tools) {
+                console.error('NATIVE_BRIDGE_LOG: Tools list response received with', response.result.tools.length, 'tools');
+              }
+            }
+          
+          sendMessageToChrome({ success: true, data: response });
+        } catch (e) {
+          console.error('NATIVE_BRIDGE_LOG: Failed to parse Game Automation response as JSON:', line);
+          // If it's not JSON, it might be a log message or initialization output
+          console.error('NATIVE_BRIDGE_LOG: Raw output (not JSON):', line);
+        }
+      }
+    });
+  } else {
+    console.error('NATIVE_BRIDGE_LOG: Game Automation server stdout is not available.');
+  }
+
+  if (gameAutomationServer.stderr) {
+    gameAutomationServer.stderr.on('data', (data: Buffer) => {
+      const error = data.toString().trim();
+      console.error(`NATIVE_BRIDGE_LOG: Game Automation stderr: ${error}`);
+    });
+  }
+
   // Handle process exit
   process.on('exit', (code) => {
     console.error(`NATIVE_BRIDGE_LOG: Exiting with code ${code}.`);
     if (mcpServerInstance && !mcpServerInstance.killed) {
       mcpServerInstance.kill();
+    }
+    if (gameAutomationServer && !gameAutomationServer.killed) {
+      gameAutomationServer.kill();
     }
   });
 
@@ -135,6 +269,59 @@ try {
 // Handle incoming message
 function handleMessage(message: any): void {
   console.error('NATIVE_BRIDGE_LOG: handleMessage called with:', message); 
+  
+  // Handle list_tools request for game automation server
+  if (message.method === 'list_tools' || message.type === 'list_tools') {
+    console.error('NATIVE_BRIDGE_LOG: Handling list_tools request');
+    if (!gameAutomationServer || !gameAutomationServer.stdin || gameAutomationServer.stdin.destroyed) {
+      sendMessageToChrome({ 
+        success: false, 
+        error: 'Game automation server not available' 
+      });
+      return;
+    }
+    
+    // Function to send the tools/list request
+    const sendToolsList = () => {
+      if (!gameAutomationServer || !gameAutomationServer.stdin || gameAutomationServer.stdin.destroyed) {
+        console.error('NATIVE_BRIDGE_LOG: Cannot send tools/list - server stdin not available');
+        sendMessageToChrome({ 
+          success: false, 
+          error: 'Game automation server stdin not available' 
+        });
+        return;
+      }
+      
+      const requestId = Date.now();
+      
+      // Your server accepts tools/list with empty params
+      const listToolsRequest = JSON.stringify({
+        jsonrpc: "2.0",
+        id: requestId,
+        method: "tools/list",
+        params: {}
+      }) + '\n';
+      
+      console.error('NATIVE_BRIDGE_LOG: Sending tools/list request:', listToolsRequest.trim());
+      console.error('NATIVE_BRIDGE_LOG: Request details - id:', requestId, 'method: tools/list, params: {}');
+      gameAutomationServer.stdin.write(listToolsRequest);
+    };
+    
+    // If we're sure it's initialized, send immediately
+    if ((gameAutomationServer as any)._initialized) {
+      console.error('NATIVE_BRIDGE_LOG: Server already initialized, sending tools/list immediately');
+      sendToolsList();
+    } else {
+      // Otherwise wait a bit for auto-initialization to complete
+      console.error('NATIVE_BRIDGE_LOG: Server not yet initialized, waiting 3 seconds for auto-initialization...');
+      setTimeout(() => {
+        console.error('NATIVE_BRIDGE_LOG: Sending tools/list after wait period');
+        sendToolsList();
+      }, 3000); // Wait 3 seconds for full initialization sequence
+    }
+    return;
+  }
+  
   if (!mcpServerInstance || !mcpServerInstance.stdin || mcpServerInstance.stdin.destroyed) { 
     console.error('NATIVE_BRIDGE_LOG: mcpServerInstance or mcpServerInstance.stdin not available in handleMessage');
     sendMessageToChrome({ success: false, error: 'NATIVE_BRIDGE_LOG: MCP server stdin not available.' });

@@ -6,8 +6,8 @@
 /// <reference types="chrome"/>
 
 interface MessageRequest {
-  type: 'browse';
-  url: string;
+  type: 'browse' | 'list_tools';
+  url?: string;
   selector?: string;
 }
 
@@ -87,6 +87,12 @@ class McpNativeClient {
       type: 'browse',
       url,
       selector
+    });
+  }
+
+  public async listTools(): Promise<any> {
+    return this.sendMessage({
+      type: 'list_tools'
     });
   }
   

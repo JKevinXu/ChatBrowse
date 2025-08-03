@@ -7,6 +7,7 @@ import { ContextService } from './context-service';
 import { ExtractionService } from './extraction-service';
 import { IntentService, IntentResult } from './intent-service';
 import { IntentType, IntentConfig, XIAOHONGSHU_CONFIG } from '../config';
+import { MCPClient } from './mcp-client';
 
 // Add Chrome types with proper interface
 declare global {
@@ -31,6 +32,7 @@ export class MessageRouter {
   private contextService = new ContextService();
   private extractionService = new ExtractionService();
   private intentService = IntentService.getInstance();
+  private mcpClient = MCPClient.getInstance();
 
   async route(
     request: any,
@@ -135,6 +137,12 @@ export class MessageRouter {
     console.log('🐛 DEBUG: Extracted sessionId:', sessionId);
     console.log('🐛 DEBUG: TabId:', tabId);
 
+    // Handle MCP requests first (simple one-click tool listing)
+    if (text.startsWith('mcp:') || this.mcpClient.isListToolsRequest(text)) {
+      console.log('🔌 [MessageRouter] Handling MCP request');
+      return await this.handleMCPRequest(text, sessionId, sendResponse);
+    }
+
     try {
       // Use LLM-based intent classification
       const context = {
@@ -197,6 +205,48 @@ export class MessageRouter {
       }
     } finally {
       console.log('🎯 [MessageRouter] ===== FINISHED USER MESSAGE HANDLING =====');
+    }
+  }
+
+  /**
+   * Handle MCP requests - simple tool listing
+   */
+  private async handleMCPRequest(
+    text: string,
+    sessionId: string,
+    sendResponse: (response: ChatResponse) => void
+  ): Promise<boolean> {
+    console.log('🔌 [MessageRouter] Processing MCP request:', text);
+    
+    try {
+      // For any MCP message, just list the tools (simple one-click behavior)
+      const tools = await this.mcpClient.listTools();
+      const formattedList = this.mcpClient.formatToolsList(tools);
+      
+      console.log('🔌 [MessageRouter] Successfully fetched', tools.length, 'MCP tools');
+      
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: formattedList,
+          sessionId: sessionId
+        }
+      });
+      
+      return true;
+      
+    } catch (error) {
+      console.error('🔌 [MessageRouter] MCP request failed:', error);
+      
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: '❌ Failed to connect to MCP server. Please try again later.',
+          sessionId: sessionId
+        }
+      });
+      
+      return false;
     }
   }
 
