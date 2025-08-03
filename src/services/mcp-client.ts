@@ -330,11 +330,11 @@ export class MCPClient {
         reject(new Error('Native messaging connection lost'));
       }
 
-      // Timeout after 30 seconds (Shimen automation can take time)
+      // Timeout after 90 seconds (Shimen automation can take time)
       setTimeout(() => {
         this.nativePort?.onMessage.removeListener(responseHandler);
         reject(new Error('Tool call timeout - the automation might still be running'));
-      }, 30000);
+      }, 90000);
     });
   }
 } 
