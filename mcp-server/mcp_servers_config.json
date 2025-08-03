@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "chatbrowse-mcp": {
+      "command": "node",
+      "args": ["./dist/index.js"],
+      "env": {},
+      "description": "ChatBrowse MCP Server for web browsing and content extraction"
+    },
+    "game-automation": {
+      "command": "/Users/kx/game_automation_project/venv/bin/python3",
+      "args": ["/Users/kx/game_automation_project/mcp_game_automation_server/server.py"],
+      "env": {},
+      "description": "Game automation MCP server for automated game interactions"
+    }
+  }
+} 

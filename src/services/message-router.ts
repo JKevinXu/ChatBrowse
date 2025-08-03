@@ -8,6 +8,7 @@ import { ExtractionService } from './extraction-service';
 import { IntentService, IntentResult } from './intent-service';
 import { IntentType, IntentConfig, XIAOHONGSHU_CONFIG } from '../config';
 import { MCPClient } from './mcp-client';
+import { MCPAgentService, isAgentRequest } from './mcp-agent-service';
 
 // Add Chrome types with proper interface
 declare global {
@@ -33,6 +34,7 @@ export class MessageRouter {
   private extractionService = new ExtractionService();
   private intentService = IntentService.getInstance();
   private mcpClient = MCPClient.getInstance();
+  private mcpAgent = MCPAgentService.getInstance();
 
   async route(
     request: any,
@@ -137,10 +139,21 @@ export class MessageRouter {
     console.log('🐛 DEBUG: Extracted sessionId:', sessionId);
     console.log('🐛 DEBUG: TabId:', tabId);
 
-    // Handle MCP requests first (simple one-click tool listing)
+    // Handle MCP requests - distinguish between tool listing and agent execution
     if (text.startsWith('mcp:') || this.mcpClient.isListToolsRequest(text)) {
       console.log('🔌 [MessageRouter] Handling MCP request');
-      return await this.handleMCPRequest(text, sessionId, sendResponse);
+      
+      // Remove 'mcp:' prefix for analysis
+      const cleanText = text.replace(/^mcp:\s*/i, '').trim();
+      
+      // Check if this is an agent request (wants to execute something)
+      if (isAgentRequest(cleanText) && !this.mcpClient.isListToolsRequest(text)) {
+        console.log('🤖 [MessageRouter] Using MCP Agent for execution request');
+        return await this.handleMCPAgentRequest(cleanText, sessionId, sendResponse);
+      } else {
+        console.log('🔌 [MessageRouter] Using MCP Client for tool listing');
+        return await this.handleMCPRequest(text, sessionId, sendResponse);
+      }
     }
 
     try {
@@ -242,6 +255,50 @@ export class MessageRouter {
         type: 'MESSAGE',
         payload: {
           text: '❌ Failed to connect to MCP server. Please try again later.',
+          sessionId: sessionId
+        }
+      });
+      
+      return false;
+    }
+  }
+
+  /**
+   * Handle MCP agent requests - intelligent tool selection and execution
+   */
+  private async handleMCPAgentRequest(
+    text: string,
+    sessionId: string,
+    sendResponse: (response: ChatResponse) => void
+  ): Promise<boolean> {
+    console.log('🤖 [MessageRouter] Processing MCP agent request:', text);
+    
+    try {
+      // Use the agent to process the request
+      const task = await this.mcpAgent.processUserRequest(text);
+      
+      // Format the response based on task status
+      const responseText = this.mcpAgent.formatAgentResponse(task);
+      
+      console.log('🤖 [MessageRouter] Agent task completed with status:', task.status);
+      
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: responseText,
+          sessionId: sessionId
+        }
+      });
+      
+      return true;
+      
+    } catch (error) {
+      console.error('🤖 [MessageRouter] MCP agent request failed:', error);
+      
+      sendResponse({
+        type: 'MESSAGE',
+        payload: {
+          text: '❌ MCP Agent failed to process your request. Please try again or be more specific.',
           sessionId: sessionId
         }
       });

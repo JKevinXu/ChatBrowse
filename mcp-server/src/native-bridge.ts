@@ -178,16 +178,20 @@ try {
             }
           }
           
-                      // Log all responses for debugging
-            if (response.error) {
-              console.error('NATIVE_BRIDGE_LOG: Received error response:', JSON.stringify(response));
-              console.error('NATIVE_BRIDGE_LOG: Error details - code:', response.error.code, 'message:', response.error.message);
-            } else if (response.result) {
-              console.error('NATIVE_BRIDGE_LOG: Received success response with result');
-              if (response.result.tools) {
-                console.error('NATIVE_BRIDGE_LOG: Tools list response received with', response.result.tools.length, 'tools');
-              }
+                                // Log all responses for debugging
+          if (response.error) {
+            console.error('NATIVE_BRIDGE_LOG: Received error response:', JSON.stringify(response));
+            console.error('NATIVE_BRIDGE_LOG: Error details - code:', response.error.code, 'message:', response.error.message);
+          } else if (response.result) {
+            console.error('NATIVE_BRIDGE_LOG: Received success response with result');
+            if (response.result.tools) {
+              console.error('NATIVE_BRIDGE_LOG: Tools list response received with', response.result.tools.length, 'tools');
+            } else if (response.result.content || response.result.isError !== undefined) {
+              console.error('NATIVE_BRIDGE_LOG: Tools call response received');
+            } else {
+              console.error('NATIVE_BRIDGE_LOG: Other response type:', Object.keys(response.result));
             }
+          }
           
           sendMessageToChrome({ success: true, data: response });
         } catch (e) {
@@ -268,8 +272,47 @@ try {
 
 // Handle incoming message
 function handleMessage(message: any): void {
-  console.error('NATIVE_BRIDGE_LOG: handleMessage called with:', message); 
+  console.error('NATIVE_BRIDGE_LOG: handleMessage called with:', message);
+  console.error('NATIVE_BRIDGE_LOG: Message type is:', typeof message.type, 'value:', message.type);
+  console.error('NATIVE_BRIDGE_LOG: Checking call_tool condition:', message.type === 'call_tool');
   
+  // Handle call_tool request for game automation server
+  if (message.type === 'call_tool') {
+    console.error('NATIVE_BRIDGE_LOG: Handling call_tool request');
+    if (!gameAutomationServer || !gameAutomationServer.stdin || gameAutomationServer.stdin.destroyed) {
+      sendMessageToChrome({ 
+        success: false, 
+        error: 'Game automation server not available' 
+      });
+      return;
+    }
+    
+    const { tool_name, parameters, request_id } = message;
+    console.error('NATIVE_BRIDGE_LOG: Tool call - name:', tool_name, 'parameters:', parameters);
+    
+    // Send tools/call request to MCP server
+    const callToolRequest = JSON.stringify({
+      jsonrpc: "2.0",
+      id: request_id || Date.now(),
+      method: "tools/call",
+      params: {
+        name: tool_name,
+        arguments: parameters || {}
+      }
+    }) + '\n';
+    
+    console.error('NATIVE_BRIDGE_LOG: Sending tools/call to game automation server:', callToolRequest.trim());
+    if (gameAutomationServer.stdin && !gameAutomationServer.stdin.destroyed) {
+      gameAutomationServer.stdin.write(callToolRequest);
+    } else {
+      sendMessageToChrome({ 
+        success: false, 
+        error: 'Game automation server stdin not available for tool call' 
+      });
+    }
+    return;
+  }
+
   // Handle list_tools request for game automation server
   if (message.method === 'list_tools' || message.type === 'list_tools') {
     console.error('NATIVE_BRIDGE_LOG: Handling list_tools request');
