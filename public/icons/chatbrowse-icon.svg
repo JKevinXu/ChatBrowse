@@ -1,0 +1,43 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="chatGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E5E7EB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main background -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGradient)" stroke="#1F2937" stroke-width="2"/>
+  
+  <!-- Browser window frame -->
+  <rect x="20" y="32" width="88" height="64" rx="8" fill="#FFFFFF" stroke="#1F2937" stroke-width="1.5"/>
+  
+  <!-- Browser window header -->
+  <rect x="20" y="32" width="88" height="12" rx="8" fill="#F3F4F6"/>
+  <rect x="20" y="38" width="88" height="6" fill="#E5E7EB"/>
+  
+  <!-- Browser dots -->
+  <circle cx="28" cy="38" r="2" fill="#EF4444"/>
+  <circle cx="36" cy="38" r="2" fill="#F59E0B"/>
+  <circle cx="44" cy="38" r="2" fill="#10B981"/>
+  
+  <!-- Chat bubble 1 -->
+  <rect x="28" y="52" width="32" height="12" rx="6" fill="url(#chatGradient)" stroke="#6B7280" stroke-width="0.5"/>
+  <circle cx="32" cy="58" r="1.5" fill="#4F46E5"/>
+  <circle cx="37" cy="58" r="1.5" fill="#4F46E5"/>
+  <circle cx="42" cy="58" r="1.5" fill="#4F46E5"/>
+  
+  <!-- Chat bubble 2 -->
+  <rect x="68" y="68" width="32" height="12" rx="6" fill="#4F46E5" stroke="#3730A3" stroke-width="0.5"/>
+  <rect x="72" y="72" width="20" height="2" rx="1" fill="#FFFFFF"/>
+  <rect x="72" y="76" width="16" height="2" rx="1" fill="#FFFFFF"/>
+  
+  <!-- Search/browse icon -->
+  <circle cx="88" cy="48" r="6" fill="none" stroke="#6B7280" stroke-width="2"/>
+  <line x1="92.5" y1="52.5" x2="96" y2="56" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
+</svg>
